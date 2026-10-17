@@ -1,0 +1,26 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Next.js / Node
+node_modules/
+.next*/
+out/
+dist/
+*.tsbuildinfo
+
+# Local tooling and OS artifacts
+.impeccable/
+.DS_Store
+Thumbs.db

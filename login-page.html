@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in to Nexora</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --radius: 1rem;
+      --shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    }
+    html { font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    body { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #bae6fd 100%); min-height: 100vh; }
+    .glass {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    .input-focus-ring:focus-within {
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+      border-color: #3b82f6;
+    }
+    .brand-gradient {
+      background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .fade-in {
+      animation: fadeIn 0.6s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .btn-primary:active { transform: translateY(1px); }
+    .social-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px -1px rgba(0,0,0,0.1); }
+    @media (max-width: 767px) {
+      .hide-mobile { display: none; }
+    }
+  </style>
+</head>
+<body class="text-slate-900 antialiased selection:bg-blue-500 selection:text-white">
+
+  <!-- Background accents (subtle decorative blobs) -->
+  <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+    <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-400/20 blur-[120px]"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-400/20 blur-[120px]"></div>
+  </div>
+
+  <main class="relative min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 py-4">
+    
+    <!-- Left: Brand panel (desktop only) -->
+    <div class="hidden lg:flex lg:w-1/2 flex-col items-center justify-center gap-6 px-8 text-center">
+      <div class="flex items-center gap-2">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight brand-gradient">Nexora</h1>
+      </div>
+      <p class="text-lg text-slate-600 max-w-sm leading-relaxed">Welcome back. Sign in to your account to continue.</p>
+
+      <div class="w-full flex flex-col gap-3 text-left">
+        <div class="flex items-center gap-3 text-sm text-slate-500">
+          <div class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
+          <span>99.9% uptime SLA</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm text-slate-500">
+          <div class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" style="animation-delay: 0.2s;"></div>
+          <span>SOC 2 Type II certified</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm text-slate-500">
+          <div class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" style="animation-delay: 0.4s;"></div>
+          <span>End-to-end encryption</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Login card -->
+    <div class="w-full max-w-md glass rounded-3xl p-8 sm:p-10 shadow-xl border-white/60 fade-in">
+      
+      <!-- Header -->
+      <div class="text-center mb-8">
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900">Sign in</h2>
+        <p class="mt-2 text-sm text-slate-500">Or <a href="#" class="font-medium text-blue-600 hover:text-blue-500">continue with Google</a></p>
+      </div>
+
+      <!-- Form -->
+      <form id="loginForm" class="space-y-5" novalidate>
+        <!-- Email -->
+        <div>
+          <label for="email" class="block text-sm font-medium text-slate-700 mb-1.5">Email address</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 0 2.5 2.5 0 005 0z"/></svg>
+            </div>
+            <input type="email" id="email" name="email" required
+              class="w-full pl-10 pr-4 py-3.5 rounded-xl border border-slate-200 bg-white/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-0 transition-all input-focus-ring disabled:opacity-70 disabled:cursor-not-allowed"
+              placeholder="you@company.com" autocomplete="email" />
+          </div>
+          <p id="emailError" class="mt-1.5 text-xs text-red-600 hidden"></p>
+        </div>
+
+        <!-- Password -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="password" class="block text-sm font-medium text-slate-700">Password</label>
+            <a href="#" class="text-xs font-medium text-blue-600 hover:text-blue-500">Forgot password?</a>
+          </div>
+          <div class="relative">
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              <button type="button" id="togglePassword" class="p-1.5 text-slate-400 hover:text-slate-600 transition-colors" aria-label="Toggle password visibility" aria-pressed="false">
+                <svg id="eyeOpen" class="h-5 w-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                <svg id="eyeClosed" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7-1.274-4.057 0-7.758 2.216-10.198.053-.097.085-.198.131-.292a1.11 1.11 0 011.086-.712c.455 0 .867.268 1.054.674l.122.267c.078.17.164.323.258.464.454.682.911 1.386 1.371 2.083.112.17.188.35.242.525.179.575.529 1.102 1.047 1.477.145.104.298.179.455.23a10.037 10.037 0 006.368 2.625c2.444 0 4.684-.784 6.41-2.147.137-.043.27-.095.404-.154.118-.051.235-.096.348-.147.527-.236.996-.543 1.37-.915.11-.112.202-.227.273-.347a2 2 0 00-.132-.278c-.284-.468-.56-.944-.82-1.425a10.2 10.2 0 00-2.345-2.172c-.17-.114-.33-.241-.492-.361a10.005 10.005 0 00-5.894-2.242c-4.478 0-8.268 2.943-9.542 7-1.274 4.057 0 7.758 2.216 10.198.053.097.085.198.131.292a1.11 1.11 0 011.086.712c.455 0 .867-.268 1.054-.674l-.122-.267c-.078-.17-.164-.323-.258-.464-.454-.682-.911-1.386-1.371-2.083-.112-.17-.188-.35-.242-.525-.179-.575-.529-1.102-1.047-1.477-.145-.104-.298-.179-.455-.23a10.037 10.037 0 01-6.368-2.625c-2.444 0-4.684.784-6.41 2.147a.7.7 0 01-.404.154c-.118.051-.235.096-.348.147-.527.236-.996.543-1.37.915-.11.112-.202.227-.273.347a2 2 0 01.132.278c.284.468.56.944.82 1.425a10.2 10.2 0 012.345 2.172c.17.114.33.241.492.361a10.005 10.005 0 015.894 2.242c4.478 0 8.268-2.943 9.542-7 1.274-4.057 0-7.758-2.216-10.198z"/></svg>
+              </button>
+            </div>
+            <input type="password" id="password" name="password" required
+              class="w-full pr-10 py-3.5 rounded-xl border border-slate-200 bg-white/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-0 transition-all input-focus-ring disabled:opacity-70 disabled:cursor-not-allowed"
+              placeholder="••••••••" autocomplete="current-password" />
+          </div>
+          <p id="passwordError" class="mt-1.5 text-xs text-red-600 hidden"></p>
+        </div>
+
+        <!-- Remember me -->
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="remember" name="remember"
+            class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 bg-gray-50 focus:border-blue-500" />
+          <label for="remember" class="text-sm text-slate-600">Remember me</label>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" id="submitBtn" class="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-blue-600 text-white font-semibold text-sm tracking-wide hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-2 transition-all btn-primary disabled:opacity-70 disabled:cursor-not-allowed" disabled>
+          <span id="btnText">Sign in</span>
+          <svg id="btnSpinner" class="h-4 w-4 hidden animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+        </button>
+      </form>
+
+      <!-- Divider -->
+      <div class="relative my-6">
+        <div class="absolute inset-0 flex items-center">
+          <span class="w-full border-t border-slate-200"></span>
+        </div>
+        <div class="relative flex justify-center text-xs uppercase font-semibold tracking-wider text-slate-400">
+          <span class="px-2 bg-white/60">Or continue with</span>
+        </div>
+      </div>
+
+      <!-- Social buttons -->
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" class="social-btn flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" class="w-5 h-5" />
+          <span>Google</span>
+        </button>
+        <button type="button" class="social-btn flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-.546-.022-1.09-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205-.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.301 3.495.998.108-.776.417-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.016 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.292c0-6.627-5.373-12-12-12"/></svg>
+          <span>GitHub</span>
+        </button>
+      </div>
+
+      <!-- Footer -->
+      <p class="mt-8 text-center text-sm text-slate-500">
+        Don't have an account?
+        <a href="#" class="font-semibold text-blue-600 hover:text-blue-500">Create an account</a>
+      </p>
+      <p class="mt-4 text-center text-xs text-slate-400">By signing in you agree to our Terms of Service and Privacy Policy.</p>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const form = document.getElementById('loginForm');
+      const email = document.getElementById('email');
+      const password = document.getElementById('password');
+      const emailError = document.getElementById('emailError');
+      const passwordError = document.getElementById('passwordError');
+      const submitBtn = document.getElementById('submitBtn');
+      const btnText = document.getElementById('btnText');
+      const btnSpinner = document.getElementById('btnSpinner');
+      const toggle = document.getElementById('togglePassword');
+      const eyeOpen = document.getElementById('eyeOpen');
+      const eyeClosed = document.getElementById('eyeClosed');
+
+      // Toggle password visibility
+      toggle.addEventListener('click', () => {
+        const isPassword = password.type === 'password';
+        password.type = isPassword ? 'text' : 'password';
+        toggle.setAttribute('aria-pressed', String(!isPassword));
+        eyeOpen.classList.toggle('hidden');
+        eyeClosed.classList.toggle('hidden');
+        password.focus();
+      });
+
+      // Simple client-side validation demo
+      function showError(input, errorEl, message) {
+        input.classList.add('border-red-300', 'input-focus-ring');
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+      }
+      function clearError(input, errorEl) {
+        input.classList.remove('border-red-300', 'input-focus-ring');
+        errorEl.classList.add('hidden');
+      }
+
+      [email, password].forEach(input => {
+        input.addEventListener('input', () => clearError(input, input === email ? emailError : passwordError));
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        let valid = true;
+
+        if (!email.value.trim() || !/^\S+@\S+\.\S+$/.test(email.value)) {
+          showError(email, emailError, 'Please enter a valid email address.');
+          valid = false;
+        } else {
+          clearError(email, emailError);
+        }
+
+        if (!password.value.trim()) {
+          showError(password, passwordError, 'Please enter your password.');
+          valid = false;
+        } else {
+          clearError(password, passwordError);
+        }
+
+        if (!valid) return;
+
+        // Loading state
+        submitBtn.disabled = true;
+        btnText.classList.add('hidden');
+        btnSpinner.classList.remove('hidden');
+
+        // Simulate API call
+        await new Promise(r => setTimeout(r, 1500));
+
+        // Demo: reset state (replace with real auth logic)
+        submitBtn.disabled = false;
+        btnText.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
+        alert('Signed in successfully! (Demo — connect your auth backend)');
+        form.reset();
+      });
+    })();
+  </script>
+</body>
+</html>

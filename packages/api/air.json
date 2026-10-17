@@ -1,0 +1,50 @@
+{
+  "schema_version": "0.2.6",
+  "build": {
+    "cmd": "go build -o ./tmp/main ./cmd/server/main.go",
+    "bin": "tmp/main",
+    "full_bin": "",
+    "include_ext": ["go", "mod", "sum"],
+    "exclude_dir": ["tmp", "vendor"],
+    "include_repo": true,
+    "exclude_file": ["air.json"],
+    "log_level": "debug",
+    "color": true,
+    "clean_on_exit": true
+  },
+  "air": {
+    "delay": "1s",
+    "wait_stop_arg": false,
+    "send_interrupt": false,
+    "kill_grace_timeout": "0s"
+  },
+  "watcher": {
+    "errors": true,
+    "watch": {
+      "enabled": true,
+      "dirs": [
+        "."
+      ],
+      "exclude_dirs": [
+        "tmp",
+        "vendor"
+      ],
+      "enable_git": true,
+      "follow_symlink": false,
+      "symlink_follow_file": false,
+      "glob_function": "filepath.Glob",
+      "regex": ".*",
+      "exclude_regex": [],
+      "include_match": ["\\.go$"],
+      "exclude_match": []
+    },
+    "scheduled": {
+      "enabled": false,
+      "items": []
+    },
+    "cli": {
+      "enabled": false,
+      "updated_by": "cli"
+    }
+  }
+}

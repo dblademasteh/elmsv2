@@ -1,0 +1,193 @@
+'use client'
+
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import {
+  LayoutDashboard,
+  BookOpen,
+  Users,
+  BarChart3,
+  Settings,
+  FileText,
+  HelpCircle,
+  LogOut,
+  GraduationCap,
+  ShoppingCart,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+import { useAuthStore } from "@/store/auth"
+
+interface NavItem {
+  name: string
+  href: string
+  icon: React.ElementType
+  roles?: string[]
+}
+
+const adminNavigation: NavItem[] = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "instructor", "student"] },
+  { name: "Courses", href: "/dashboard/courses", icon: BookOpen, roles: ["admin", "instructor", "student"] },
+  { name: "My Learning", href: "/dashboard/learning", icon: GraduationCap, roles: ["student"] },
+  { name: "Users", href: "/dashboard/users", icon: Users, roles: ["admin", "instructor"] },
+  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, roles: ["admin", "instructor"] },
+  { name: "Content", href: "/dashboard/content", icon: FileText, roles: ["admin", "instructor"] },
+  { name: "Enrollment Requests", href: "/dashboard/enrollments", icon: ShoppingCart, roles: ["admin"] },
+]
+
+const bottomNavigation: NavItem[] = [
+  { name: "Settings", href: "/dashboard/settings", icon: Settings },
+  { name: "Help Center", href: "/dashboard/help", icon: HelpCircle },
+]
+
+function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "group relative flex items-center gap-3.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200",
+        isActive
+          ? "bg-primary/10 text-primary shadow-inner shadow-primary/5"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+      )}
+      aria-label={item.name}
+    >
+      <item.icon
+        className={cn(
+          "h-5 w-5 shrink-0 transition-colors",
+          isActive ? "text-primary" : "group-hover:text-foreground"
+        )}
+        aria-hidden="true"
+      />
+      <span>{item.name}</span>
+
+      {isActive && (
+        <div
+          className="absolute inset-y-0 left-0 w-0.5 rounded-r-full bg-primary"
+          aria-hidden="true"
+        />
+      )}
+    </Link>
+  )
+}
+
+function SignOutButton({ onSignOut }: { onSignOut: () => void }) {
+  return (
+    <button
+      onClick={onSignOut}
+      className="group relative flex w-full items-center gap-3.5 rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground"
+      aria-label="Sign out"
+    >
+      <LogOut
+        className="h-5 w-5 shrink-0 group-hover:text-foreground"
+        aria-hidden="true"
+      />
+      <span>Sign Out</span>
+    </button>
+  )
+}
+
+export function Sidebar() {
+  const pathname = usePathname()
+  const { user, logout } = useAuthStore()
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case "admin":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400"
+      case "instructor":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
+      default:
+        return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+    }
+  }
+
+  // Filter navigation items by user role
+  const visibleNav = adminNavigation.filter(
+    (item) => !item.roles || !user?.role || item.roles.includes(user.role)
+  )
+
+  return (
+    <aside
+      className="flex h-screen w-64 flex-col overflow-y-auto overflow-x-hidden bg-card border-r border-border"
+      aria-label="Main navigation"
+    >
+      {/* Logo */}
+      <div className="flex h-16 items-center gap-2 px-6 border-b border-border">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+          <BookOpen className="h-5 w-5 text-primary" aria-hidden="true" />
+        </div>
+        <span className="text-xl font-bold tracking-tight text-foreground">
+          Learn<span className="text-primary">.</span>
+        </span>
+      </div>
+
+      {/* User Info */}
+      {user && (
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
+          <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-sm font-medium text-foreground">
+            {user.full_name
+              ?.split(" ")
+              .map((n) => n[0])
+              .join("")
+              .toUpperCase() ?? "U"}
+            <span
+              className={cn(
+                "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-card",
+                user.role === "admin"
+                  ? "bg-amber-400"
+                  : user.role === "instructor"
+                  ? "bg-emerald-400"
+                  : "bg-sky-400"
+              )}
+              aria-label={`Status: ${user.role}`}
+            />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-foreground">
+              {user.full_name}
+            </span>
+            <span className="text-xs text-muted-foreground">{user.email}</span>
+          </div>
+          <span
+            className={cn(
+              "ml-auto rounded-full px-2.5 py-0.5 text-xs font-semibold",
+              getRoleColor(user.role)
+            )}
+          >
+            {user.role}
+          </span>
+        </div>
+      )}
+
+      {/* Main Navigation */}
+      <nav className="flex-1 space-y-1 px-4 py-6" aria-label="Main navigation">
+        {visibleNav.map((item) => {
+          const isActive = pathname === item.href
+          return (
+            <div key={item.name}>
+              <NavLink item={item} isActive={isActive} />
+            </div>
+          )
+        })}
+      </nav>
+
+      {/* Bottom Navigation */}
+      <div className="border-t border-border px-4 py-6">
+        <nav aria-label="Secondary navigation">
+          {bottomNavigation.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <div key={item.name} className="mb-1 last:mb-0">
+                <NavLink item={item} isActive={isActive} />
+              </div>
+            )
+          })}
+        </nav>
+
+        <div className="mt-2">
+          <SignOutButton onSignOut={logout} />
+        </div>
+      </div>
+    </aside>
+  )
+}
