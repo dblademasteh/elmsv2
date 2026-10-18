@@ -1,0 +1,15 @@
+.git
+.github
+.kilo
+.opencode
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.env
+.env.*
+node_modules
+packages/web/.next*
+packages/web/node_modules
+opencode-config-backup
+uploads

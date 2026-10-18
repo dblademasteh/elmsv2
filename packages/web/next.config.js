@@ -2,6 +2,7 @@
 const path = require('path');
 
 const nextConfig = {
+  output: 'standalone',
   // Allow a development server to use its own output directory alongside builds.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,

@@ -26,18 +26,23 @@ app = FastAPI(
 # CORS Middleware
 configured_frontend = settings.FRONTEND_URL.strip().rstrip("/")
 allowed_origins = [configured_frontend] if configured_frontend and configured_frontend != "*" else []
+allowed_origin_regex = None
 if settings.ENVIRONMENT == "development":
     allowed_origins.extend((
         "http://localhost:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
+        "http://10.0.1.13:3000",
+        "http://172.19.0.2:3000",
     ))
+    allowed_origin_regex = r"https://[a-z0-9-]+\.trycloudflare\.com"
 allowed_origins = list(dict.fromkeys(allowed_origins))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=allowed_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
