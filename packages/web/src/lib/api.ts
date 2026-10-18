@@ -849,6 +849,55 @@ export const announcementApi = {
   remove: (id: string) => api.delete<{ message: string }>(`/announcements/${id}`),
 };
 
+// Discussions (course forums)
+export interface DiscussionThreadRow {
+  id: string;
+  title: string;
+  author_id: string;
+  author_name: string;
+  is_pinned: boolean;
+  is_locked: boolean;
+  reply_count: number;
+  created_at: string | null;
+}
+
+export interface DiscussionThreadDetail {
+  id: string;
+  course_id: string;
+  title: string;
+  is_locked: boolean;
+  is_pinned: boolean;
+  created_at: string | null;
+  posts: Array<{
+    id: string;
+    author_id: string;
+    author_name: string;
+    author_role: string;
+    body: string;
+    created_at: string | null;
+  }>;
+}
+
+export const discussionApi = {
+  list: (courseId: string) =>
+    api.get<Array<DiscussionThreadRow>>(`/discussions/course/${courseId}`),
+
+  create: (courseId: string, data: { title: string; body: string; lesson_id?: string }) =>
+    api.post<{ message: string; id: string }>(`/discussions/course/${courseId}`, data),
+
+  get: (threadId: string) =>
+    api.get<DiscussionThreadDetail>(`/discussions/${threadId}`),
+
+  reply: (threadId: string, body: string) =>
+    api.post<{ message: string; id: string }>(`/discussions/${threadId}/posts`, { body }),
+
+  removeThread: (threadId: string) =>
+    api.delete<{ message: string }>(`/discussions/${threadId}`),
+
+  removePost: (postId: string) =>
+    api.delete<{ message: string }>(`/discussions/posts/${postId}`),
+};
+
 // Dashboard statistics
 export const dashboardApi = {
   getStats: () =>

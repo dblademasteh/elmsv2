@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator"
 import { authApi, courseApi, enrollmentApi, reviewApi } from "@/lib/api"
 import { useAuthStore } from "@/store/auth"
+import { CourseDiscussions } from "@/components/discussions/course-discussions"
 
 export default function CoursePage() {
   const params = useParams()
@@ -474,6 +475,8 @@ export default function CoursePage() {
               </div>
             )}
           </div>
+
+          <CourseDiscussions courseId={courseId} />
         </div>
       </div>
     </div>
