@@ -807,6 +807,48 @@ export const gradebookApi = {
   },
 };
 
+// Notifications (in-app)
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link_url: string | null;
+  read_at: string | null;
+  created_at: string | null;
+}
+
+export const notificationApi = {
+  list: (unreadOnly?: boolean) =>
+    api.get<{ unread_count: number; notifications: Array<AppNotification> }>(
+      `/notifications${unreadOnly ? '?unread_only=true' : ''}`
+    ),
+
+  markRead: (id: string) => api.post<{ message: string }>(`/notifications/${id}/read`, {}),
+
+  markAllRead: () => api.post<{ message: string }>('/notifications/read-all', {}),
+};
+
+// Announcements
+export interface Announcement {
+  id: string;
+  author_name: string;
+  course_id: string | null;
+  course_title: string | null;
+  title: string;
+  body: string;
+  created_at: string | null;
+}
+
+export const announcementApi = {
+  list: () => api.get<Array<Announcement>>('/announcements/'),
+
+  create: (data: { title: string; body: string; course_id?: string }) =>
+    api.post<{ message: string; id: string; course_id: string | null }>('/announcements/', data),
+
+  remove: (id: string) => api.delete<{ message: string }>(`/announcements/${id}`),
+};
+
 // Dashboard statistics
 export const dashboardApi = {
   getStats: () =>

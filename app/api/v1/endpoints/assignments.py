@@ -397,4 +397,21 @@ async def grade_assignment_submission(
         grader_id=user.id,
     )
 
+    # Notify the student that their work was graded
+    if assignment:
+        from app.crud.notification import create_notification
+        percent = (
+            round(grade_data.score / assignment.max_score * 100, 1)
+            if assignment.max_score
+            else grade_data.score
+        )
+        await create_notification(
+            db,
+            user_id=submission.user_id,
+            type="grade",
+            title=f"Assignment graded: {assignment.title}",
+            body=f"You scored {grade_data.score:g}/{assignment.max_score:g} ({percent}%).",
+            link_url="/dashboard/assignments",
+        )
+
     return await _get_submission_response(graded.id, db)

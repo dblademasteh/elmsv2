@@ -52,8 +52,8 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | **Progress tracking & persistence** | ✅ `lesson_progress` table + endpoints, live in learn UI (manual completion) | ✅ | ✅ | ✅ | ✅ |
 | **Certificates** | ❌ columns only | ✅ plugin | ✅ | ✅ | ✅ |
 | **Discussions / forums** | ❌ (tables in SQL migration only) | ✅ | ✅ | ✅ | ✅ |
-| **Announcements** | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **Messaging / notifications / email** | ❌ | ✅ | ✅ | ✅ | ✅ |
+| **Announcements** | ✅ platform-wide + course-scoped, in-app | ✅ | ✅ | ✅ | ✅ |
+| **Messaging / notifications / email** | ⚠️ in-app notifications (grading, enrollments) + read/unread; no email/chat | ✅ | ✅ | ✅ | ✅ |
 | **Calendar / due dates view** | ❌ (`due_date` never surfaced) | ✅ | ✅ | ✅ | ✅ |
 | **Analytics & reporting** | ⚠️ real role-aware stats + per-course enrollment analytics; no logs/report builder | ✅ logs, completion, report builder | ✅ Analytics 2 / Canvas Data | ✅ (strongest: Insights) | ✅ |
 | **Course reviews & ratings** | ✅ 3-criterion + distribution | ⚠️ plugin | ❌ | ❌ | ❌ |
@@ -113,7 +113,7 @@ Ordered by benchmark impact per unit of effort:
 | 3 | ✅ **DONE** **Gradebook** — `GET /dashboard/gradebook` (role-aware: instructor sees own courses' students, student sees own grades; overall = mean of quiz-avg grade and assignment-avg percent) + `GET /dashboard/gradebook/export` CSV, wired into a new `/dashboard/gradebook` page with course filter | Core expectation; score data already exists | M |
 | 4 | ✅ **DONE** **Stub pages replaced with real data** — analytics page (role-aware stat cards from `GET /dashboard/stats` + real per-course enrollment chart), content page (real lesson inventory via lessons API, `?mine=true` added to course list for instructors), enrollments page (real enrollment list; fake "approve" UI removed — a real approval workflow is still future work, see matrix) | Fake UI is a credibility tax in any comparison | M |
 | 5 | ✅ **DONE** **Course authoring UI** — "My Courses" management page on `/dashboard/courses`: create dialog (title/short description/description/level/price, featured flag for admins), inline edit dialog, publish/unpublish toggle, archive with confirm; drafts visible to their instructor via `?mine=true` | Blocks instructors from actually using the product | M |
-| 6 | **Notifications + announcements** (even in-app only, no SMTP) ([#4](https://github.com/dblademasteh/elmsv2/issues/4)) | Table-less; communication is table stakes | M |
+| 6 | ✅ **DONE** **Notifications + announcements (in-app)** — `notifications` table + `GET /notifications` (unread count) / `POST /{id}/read` / `POST /read-all`; triggered on assignment grading (→ student) and new enrollment (→ instructor); `announcements` table (platform-wide for admins, course-scoped for instructors) with visibility rules (global ∪ enrolled courses ∪ own posts) and author/admin delete; new `/dashboard/notifications` page with tabs, compose dialog, sidebar entry. No SMTP — email delivery remains future work. | Communication is table stakes | M |
 | 7 | **Discussions** — tables already in `migrations/000001` ([#5](https://github.com/dblademasteh/elmsv2/issues/5)) | Schema is ahead of implementation | M |
 | 8 | ✅ **DONE** **Password reset + account lockout** — `POST /auth/reset-password` (no user enumeration; SHA-256-hashed single-use token, 60-min expiry; dev-only inline token since no email service) + `POST /auth/reset-password/confirm` (8-char minimum, clears lockout), login lockout (5 failures → 15-min 423 lock, cleared on success/reset), new `/forgot-password` page wired to the previously dead client methods. Email verification remains out of scope (no SMTP). | Security baseline | S–M |
 | 9 | ✅ **DONE** **Quiz enforcement** — `POST /courses/quizzes/{id}/start` attempt flow with server-side time-limit enforcement (+15s grace), server-side question randomization, ownership checks on create/delete | Flags exist but were lies before | S |

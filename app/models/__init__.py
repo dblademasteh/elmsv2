@@ -7,5 +7,7 @@ from .review import Review
 from .assignment import Assignment, AssignmentSubmission
 from .lesson_progress import LessonProgress
 from .password_reset import PasswordResetToken
+from .notification import Notification
+from .announcement import Announcement
 
-__all__ = ["User", "Course", "Enrollment", "Lesson", "Quiz", "QuizAttempt", "Review", "Assignment", "AssignmentSubmission", "LessonProgress", "PasswordResetToken"]
+__all__ = ["User", "Course", "Enrollment", "Lesson", "Quiz", "QuizAttempt", "Review", "Assignment", "AssignmentSubmission", "LessonProgress", "PasswordResetToken", "Notification", "Announcement"]

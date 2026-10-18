@@ -182,6 +182,19 @@ async def create_enrollment_endpoint(
         )
 
     new_enrollment = await create_enrollment(db, user.id, enrollment_in.course_id)
+
+    # Notify the course instructor about the new enrollment
+    if course.instructor_id:
+        from app.crud.notification import create_notification
+        await create_notification(
+            db,
+            user_id=course.instructor_id,
+            type="enrollment",
+            title=f"New enrollment: {course.title}",
+            body=f"{user.full_name} ({user.email}) enrolled in {course.title}.",
+            link_url="/dashboard/gradebook",
+        )
+
     return {
         "message": "Successfully enrolled in course",
         "enrollment_id": str(new_enrollment.id),
