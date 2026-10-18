@@ -82,7 +82,7 @@ export default function ExamsPage() {
       if (isManager) {
         const coursesResp = await courseApi.list({ mine: true, limit: 50 })
         if (!coursesResp.data) {
-          toast({ title: "Failed to load courses", description: coursesResp.error, variant: "destructive" })
+          toast({ title: "Failed to load courses", description: coursesResp.error })
           setLoading(false)
           return
         }
@@ -120,7 +120,7 @@ export default function ExamsPage() {
       } else {
         const enrollmentsResp = await enrollmentApi.list({ limit: 100 })
         if (!enrollmentsResp.data) {
-          toast({ title: "Failed to load enrollments", description: enrollmentsResp.error, variant: "destructive" })
+          toast({ title: "Failed to load enrollments", description: enrollmentsResp.error, })
           setLoading(false)
           return
         }
@@ -162,7 +162,7 @@ export default function ExamsPage() {
         })
       }
     } catch {
-      toast({ title: "Failed to load exams", variant: "destructive" })
+      toast({ title: "Failed to load exams", })
     } finally {
       setLoading(false)
     }
@@ -209,7 +209,7 @@ export default function ExamsPage() {
         description: data.description.trim() || undefined,
       })
       if (response.error) {
-        toast({ title: "Failed to create exam", description: response.error, variant: "destructive" })
+        toast({ title: "Failed to create exam", description: response.error, })
         return
       }
       setDialogOpen(false)
@@ -218,7 +218,7 @@ export default function ExamsPage() {
       load()
       toast({ title: "Exam created" })
     } catch {
-      toast({ title: "Failed to create exam", variant: "destructive" })
+      toast({ title: "Failed to create exam", })
     } finally {
       setSaving(false)
     }
