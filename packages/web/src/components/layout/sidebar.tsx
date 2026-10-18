@@ -13,6 +13,7 @@ import {
   LogOut,
   GraduationCap,
   ShoppingCart,
+  User,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth"
@@ -24,19 +25,45 @@ interface NavItem {
   roles?: string[]
 }
 
-const adminNavigation: NavItem[] = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "instructor", "student"] },
-  { name: "Courses", href: "/dashboard/courses", icon: BookOpen, roles: ["admin", "instructor", "student"] },
-  { name: "My Learning", href: "/dashboard/learning", icon: GraduationCap, roles: ["student"] },
-  { name: "Users", href: "/dashboard/users", icon: Users, roles: ["admin", "instructor"] },
-  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, roles: ["admin", "instructor"] },
-  { name: "Content", href: "/dashboard/content", icon: FileText, roles: ["admin", "instructor"] },
-  { name: "Enrollment Requests", href: "/dashboard/enrollments", icon: ShoppingCart, roles: ["admin"] },
-]
+interface NavGroup {
+  label: string
+  items: NavItem[]
+}
 
-const bottomNavigation: NavItem[] = [
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
-  { name: "Help Center", href: "/dashboard/help", icon: HelpCircle },
+const navigationGroups: NavGroup[] = [
+  {
+    label: "Overview",
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "instructor", "student"] },
+    ],
+  },
+  {
+    label: "Learning",
+    items: [
+      { name: "Courses", href: "/dashboard/courses", icon: BookOpen, roles: ["admin", "instructor", "student"] },
+      { name: "My Learning", href: "/dashboard/learning", icon: GraduationCap, roles: ["student"] },
+      { name: "My Assignments", href: "/dashboard/assignments", icon: FileText, roles: ["student"] },
+    ],
+  },
+  {
+    label: "Management",
+    items: [
+      { name: "Users", href: "/dashboard/users", icon: Users, roles: ["admin", "instructor"] },
+      { name: "Students", href: "/dashboard/students", icon: Users, roles: ["admin", "instructor"] },
+      { name: "Quizzes", href: "/dashboard/courses", icon: HelpCircle, roles: ["admin", "instructor"] },
+      { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, roles: ["admin", "instructor"] },
+      { name: "Content", href: "/dashboard/content", icon: FileText, roles: ["admin", "instructor"] },
+      { name: "Enrollment Requests", href: "/dashboard/enrollments", icon: ShoppingCart, roles: ["admin"] },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { name: "Profile", href: "/profile", icon: User, roles: ["admin", "instructor", "student"] },
+      { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ["admin", "instructor", "student"] },
+      { name: "Help Center", href: "/dashboard/help", icon: HelpCircle, roles: ["admin", "instructor", "student"] },
+    ],
+  },
 ]
 
 function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
@@ -67,6 +94,22 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
         />
       )}
     </Link>
+  )
+}
+
+function NavGroup({ group, pathname }: { group: NavGroup; pathname: string }) {
+  return (
+    <div className="mb-5 last:mb-0">
+      <p className="px-4 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/60 mb-1.5">
+        {group.label}
+      </p>
+      <div className="space-y-1">
+        {group.items.map((item) => {
+          const isActive = pathname === item.href
+          return <NavLink key={item.name} item={item} isActive={isActive} />
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -101,10 +144,15 @@ export function Sidebar() {
     }
   }
 
-  // Filter navigation items by user role
-  const visibleNav = adminNavigation.filter(
-    (item) => !item.roles || !user?.role || item.roles.includes(user.role)
-  )
+  // Filter and group navigation items by user role
+  const visibleGroups = navigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => !item.roles || !user?.role || item.roles.includes(user.role)
+      ),
+    }))
+    .filter((group) => group.items.length > 0)
 
   return (
     <aside
@@ -159,34 +207,16 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Main Navigation */}
+      {/* Main Navigation - Grouped */}
       <nav className="flex-1 space-y-1 px-4 py-6" aria-label="Main navigation">
-        {visibleNav.map((item) => {
-          const isActive = pathname === item.href
-          return (
-            <div key={item.name}>
-              <NavLink item={item} isActive={isActive} />
-            </div>
-          )
-        })}
+        {visibleGroups.map((group) => (
+          <NavGroup key={group.label} group={group} pathname={pathname} />
+        ))}
       </nav>
 
-      {/* Bottom Navigation */}
+      {/* Bottom: Sign Out */}
       <div className="border-t border-border px-4 py-6">
-        <nav aria-label="Secondary navigation">
-          {bottomNavigation.map((item) => {
-            const isActive = pathname === item.href
-            return (
-              <div key={item.name} className="mb-1 last:mb-0">
-                <NavLink item={item} isActive={isActive} />
-              </div>
-            )
-          })}
-        </nav>
-
-        <div className="mt-2">
-          <SignOutButton onSignOut={logout} />
-        </div>
+        <SignOutButton onSignOut={logout} />
       </div>
     </aside>
   )

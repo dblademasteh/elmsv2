@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { courseApi } from "@/lib/api"
+import { LandingAppBar } from "@/components/layout/landing-appbar"
 
 type Course = {
   id: string
@@ -119,6 +120,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <LandingAppBar />
       {/* Hero Section */}
       <section className="relative isolate overflow-hidden border-b border-border bg-muted/30">
         <div

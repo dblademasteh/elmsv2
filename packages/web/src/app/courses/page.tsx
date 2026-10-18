@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Search, Grid, List, ArrowRight, Play, Star, Clock } from "lucide-react"
@@ -14,6 +14,14 @@ const LEVELS = ["All levels", "Beginner", "Intermediate", "Advanced"]
 const PRICES = ["All prices", "Free", "Under $50", "$50 - $100", "Over $100"]
 
 export default function CoursesPage() {
+  return (
+    <Suspense fallback={<div className="flex h-64 items-center justify-center"><div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" /></div>}>
+      <CoursesContent />
+    </Suspense>
+  )
+}
+
+function CoursesContent() {
   const [courses, setCourses] = useState<any[]>([])
   const [level, setLevel] = useState("All levels")
   const [price, setPrice] = useState("All prices")
