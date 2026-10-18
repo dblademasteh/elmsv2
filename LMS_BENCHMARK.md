@@ -85,7 +85,7 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | Enrollments & progress | ~65% | Progress persisted end-to-end in the learn UI; approval workflow still a fake UI page. |
 | Reviews/ratings | ~85% | Genuine differentiator; Moodle needs a plugin, Canvas has none. |
 | Frontend overall | ~75% | No stub routes remain; authoring UI shipped. |
-| Infrastructure | ~45% | Redis unused, no alembic, no tests, no CI. |
+| Infrastructure | ~75% | Alembic + 20-test suite + CI shipped; Redis unused, no S3/rate limiting. |
 
 **Aggregate:** eLMS ≈ **15–20%** of the capability surface of Moodle/Chamilo, and well under 10% of Canvas/Open edX (which add scale, standards, and analytics).
 
@@ -118,7 +118,7 @@ Ordered by benchmark impact per unit of effort:
 | 8 | ✅ **DONE** **Password reset + account lockout** — `POST /auth/reset-password` (no user enumeration; SHA-256-hashed single-use token, 60-min expiry; dev-only inline token since no email service) + `POST /auth/reset-password/confirm` (8-char minimum, clears lockout), login lockout (5 failures → 15-min 423 lock, cleared on success/reset), new `/forgot-password` page wired to the previously dead client methods. Email verification remains out of scope (no SMTP). | Security baseline | S–M |
 | 9 | ✅ **DONE** **Quiz enforcement** — `POST /courses/quizzes/{id}/start` attempt flow with server-side time-limit enforcement (+15s grace), server-side question randomization, ownership checks on create/delete | Flags exist but were lies before | S |
 | 10 | ✅ **DONE** **Course structure + search** — server-side `search` (title/description ILIKE), `level`, price-range (`min_price_cents`/`max_price_cents`), and `sort` (popular/rating/newest/price) on `GET /courses`, wired into the catalog with a sort dropdown and debounced server-side filtering; lesson `section_title` for course sections (idempotent ALTER migration), real syllabus on the course page (replaced hardcoded fake), section editing in the Content page. Full module entities (module table + drag/drop) remain future work. | Catalog scalability | M |
-| 11 | **Migrations (alembic) + tests + CI** ([#8](https://github.com/dblademasteh/elmsv2/issues/8)) | Required before any production claim | M |
+| 11 | ✅ **DONE** **Migrations + tests + CI** — Alembic wired to app settings (sync psycopg2 driver); initial migration covering all 15 tables, fresh-DB `upgrade head` verified, `lms_dev` stamped; 20-test integration suite (auth/lockout/reset, authoring+search, enrollments+gradebook, announcements/discussions/notifications) running against an isolated `lms_test` DB migrated with the real migrations; GitHub Actions CI (postgres:16 service + pytest; npm ci + lint + tsc + build) | Required before any production claim | M |
 | 12 | **LTI 1.3 + SCORM import** ([#9](https://github.com/dblademasteh/elmsv2/issues/9)) | Only path to interop parity | L |
 | 13 | **i18n (next-intl) + accessibility audit** ([#10](https://github.com/dblademasteh/elmsv2/issues/10)) | Parity with all four competitors | L |
 | 14 | **Mobile/PWA** ([#11](https://github.com/dblademasteh/elmsv2/issues/11)) | Moodle's offline app is a documented differentiator | L |
