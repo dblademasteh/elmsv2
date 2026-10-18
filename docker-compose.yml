@@ -56,7 +56,7 @@ services:
       context: ./packages/web
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8081/api/v1}
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api/v1}
     container_name: lms-web-dev
     ports:
       - "3000:3000"
