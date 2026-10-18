@@ -1,11 +1,13 @@
 """Authentication endpoints"""
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.schemas.auth import Token, LoginRequest, RegisterRequest, RefreshTokenRequest
+from app.schemas.auth import Token, LoginRequest, RegisterRequest, RefreshTokenRequest, LogoutRequest
 from app.schemas.user import UserResponse
 from app.core import security
+from app.core.config import settings
 from app.db.database import get_db
-from app.crud.user import get_user_by_email, create_user
+from app.crud.user import get_user_by_email, get_user_by_id, create_user
 from datetime import timedelta
+import uuid
 
 router = APIRouter()
 
@@ -49,7 +51,7 @@ async def login(form_data: LoginRequest, db: get_db = Depends()):
     
     access_token = security.create_access_token(
         data={"sub": str(user.id), "email": user.email, "role": user.role},
-        expires_delta=timedelta(minutes=30)
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     refresh_token = security.create_refresh_token(
         data={"sub": str(user.id)}
@@ -60,3 +62,43 @@ async def login(form_data: LoginRequest, db: get_db = Depends()):
         refresh_token=refresh_token,
         token_type="bearer"
     )
+
+@router.post("/refresh", response_model=Token)
+async def refresh_access_token(refresh_in: RefreshTokenRequest, db: get_db = Depends()):
+    """Exchange a valid refresh token for a new access + refresh token pair."""
+    payload = security.decode_token(refresh_in.refresh_token)
+    if not payload or payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    try:
+        user_id = uuid.UUID(payload.get("sub", ""))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    user = await get_user_by_id(db, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    return Token(
+        access_token=security.create_access_token(
+            data={"sub": str(user.id), "email": user.email, "role": user.role},
+            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        ),
+        refresh_token=security.create_refresh_token(data={"sub": str(user.id)}),
+        token_type="bearer",
+    )
+
+@router.post("/logout", response_model=dict)
+async def logout(payload: LogoutRequest = None):
+    """Log out. JWTs are stateless, so the client discards its tokens; the
+    refresh token (if provided) is simply no longer used."""
+    return {"message": "Logged out successfully"}

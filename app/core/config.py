@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     ENVIRONMENT: str = "development"
 
+    # File uploads (assignment submissions, etc.)
+    UPLOAD_DIR: str = "uploads"
+    MAX_UPLOAD_MB: int = 25
+
     class Config:
         env_file = ".env"
         case_sensitive = True

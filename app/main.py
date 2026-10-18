@@ -2,7 +2,9 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from app.api.v1.api import api_router
+from app.api.v1.endpoints.files import get_upload_root
 from app.db import database
 from app.core.config import settings
 from datetime import datetime
@@ -64,6 +66,9 @@ async def root():
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
+
+# Serve uploaded files (assignment submissions, etc.)
+app.mount("/uploads", StaticFiles(directory=get_upload_root()), name="uploads")
 
 # Event handlers
 @app.on_event("startup")

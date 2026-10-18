@@ -9,7 +9,7 @@ from app.crud.course import get_course_by_id_raw
 from app.core.security import get_password_hash
 from typing import List, Optional
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 async def get_enrollments(
     db: AsyncSession,
@@ -137,11 +137,11 @@ async def update_enrollment_progress(
     enrollment.progress_percent = min(max(progress_percent, 0.0), 100.0)
     if total_minutes is not None:
         enrollment.total_minutes = total_minutes
-    enrollment.last_accessed_at = datetime.utcnow()
+    enrollment.last_accessed_at = datetime.now(timezone.utc)
 
     if enrollment.progress_percent >= 100 and enrollment.status != "completed":
         enrollment.status = "completed"
-        enrollment.completed_at = datetime.utcnow()
+        enrollment.completed_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(enrollment)

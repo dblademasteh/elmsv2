@@ -111,6 +111,8 @@ export default function CourseLearnPage() {
   const [mySubmissions, setMySubmissions] = useState<Record<string, MySubmission>>({})
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0)
   const [enrollment, setEnrollment] = useState<MyEnrollment | null>(null)
+  const [completedLessons, setCompletedLessons] = useState<string[]>([])
+  const [markingComplete, setMarkingComplete] = useState(false)
   const [loading, setLoading] = useState(true)
   const [activeContent, setActiveContent] = useState<"lesson" | "quiz">("lesson")
 
@@ -156,7 +158,7 @@ export default function CourseLearnPage() {
         setMySubmissions(subs)
       }
 
-      // Find enrollment
+      // Find enrollment + load persisted lesson progress
       const enrollResp = await enrollmentApi.getMyEnrollments()
       if (enrollResp.data) {
         const myEnrollment = (enrollResp.data as unknown as MyEnrollment[]).find(
@@ -164,6 +166,15 @@ export default function CourseLearnPage() {
         )
         if (myEnrollment) {
           setEnrollment(myEnrollment)
+          const progressResp = await lessonApi.getProgress(courseId)
+          if (progressResp.data && progressResp.data.enrollment_id === myEnrollment.id) {
+            setCompletedLessons(progressResp.data.completed_lesson_ids)
+            setEnrollment({
+              ...myEnrollment,
+              progress_percent: progressResp.data.progress_percent,
+              status: progressResp.data.status,
+            })
+          }
         }
       }
     } catch {
@@ -182,17 +193,36 @@ export default function CourseLearnPage() {
   }, [courseId, isAuthenticated(), loadCourse])
 
   const currentLesson = lessons[currentLessonIndex]
-  const lessonQuizzes = quizzes.filter(q => {
-    // Quizzed lessons would have the quiz linked via lesson_id
-    return true
-  })
+  // All course quizzes are listed in the sidebar (click opens the quiz player)
+  const lessonQuizzes = quizzes
 
-  function handleLessonComplete() {
-    // In a full implementation, this would update progress
+  async function handleLessonComplete() {
+    const lesson = lessons[currentLessonIndex]
+    if (!lesson) return
+
+    // Persist completion - the server recomputes and stores course progress
+    if (!completedLessons.includes(lesson.id)) {
+      setMarkingComplete(true)
+      try {
+        const resp = await lessonApi.markComplete(lesson.id)
+        if (resp.data) {
+          setCompletedLessons(resp.data.completed_lesson_ids)
+          setEnrollment((prev) =>
+            prev
+              ? { ...prev, progress_percent: resp.data!.progress_percent, status: resp.data!.status }
+              : prev
+          )
+        } else if (resp.error) {
+          console.warn("Could not save progress:", resp.error)
+        }
+      } finally {
+        setMarkingComplete(false)
+      }
+    }
+
     if (currentLessonIndex < lessons.length - 1) {
       setCurrentLessonIndex(currentLessonIndex + 1)
     } else {
-      // Show completion
       alert("Congratulations! You've completed all lessons in this course.")
     }
   }
@@ -290,10 +320,16 @@ export default function CourseLearnPage() {
                     className={`flex h-5 w-5 items-center justify-center rounded ${
                       currentLessonIndex === index
                         ? "bg-primary text-primary-foreground"
+                        : completedLessons.includes(lesson.id)
+                        ? "bg-primary/15 text-primary"
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    {index + 1}
+                    {completedLessons.includes(lesson.id) ? (
+                      <CheckCircle className="h-3.5 w-3.5" />
+                    ) : (
+                      index + 1
+                    )}
                   </div>
                   <span className="truncate">{lesson.title}</span>
                   {lesson.estimated_minutes && (
@@ -313,8 +349,7 @@ export default function CourseLearnPage() {
                       <button
                         key={quiz.id}
                         onClick={() => {
-                          setActiveContent("quiz")
-                          // In full implementation, load quiz by ID
+                          router.push(`/dashboard/quizzes/${quiz.id}/take`)
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                       >
@@ -421,8 +456,8 @@ export default function CourseLearnPage() {
                     <ChevronLeft className="h-4 w-4 mr-1" />
                     Previous
                   </Button>
-                  <Button onClick={handleLessonComplete}>
-                    Mark as Complete
+                  <Button onClick={handleLessonComplete} disabled={markingComplete}>
+                    {markingComplete ? "Saving..." : "Mark as Complete"}
                     <CheckCircle className="h-4 w-4 ml-2" />
                   </Button>
                   {currentLessonIndex < lessons.length - 1 && (

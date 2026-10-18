@@ -11,14 +11,48 @@ interface ApiResponse<T> {
 
 class ApiClient {
   private baseUrl: string;
+  private refreshPromise: Promise<string | null> | null = null;
 
   constructor(baseUrl: string = API_URL) {
     this.baseUrl = baseUrl;
   }
 
+  /**
+   * Exchange the stored refresh token for a new access token (single-flight:
+   * concurrent 401s trigger only one refresh call).
+   */
+  private refreshTokens(): Promise<string | null> {
+    if (!this.refreshPromise) {
+      this.refreshPromise = (async () => {
+        const refreshToken = useAuthStore.getState().refreshToken;
+        if (!refreshToken) return null;
+
+        try {
+          const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ refresh_token: refreshToken }),
+          });
+          if (!response.ok) return null;
+
+          const data = await response.json();
+          useAuthStore.getState().setTokens(data.access_token, data.refresh_token);
+          return data.access_token as string;
+        } catch {
+          return null;
+        }
+      })().finally(() => {
+        this.refreshPromise = null;
+      });
+    }
+    return this.refreshPromise;
+  }
+
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    isRetry = false
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
 
@@ -38,6 +72,14 @@ class ApiClient {
 
     try {
       const response = await fetch(url, config);
+
+      if (response.status === 401 && !isRetry && !endpoint.startsWith('/auth/')) {
+        // Access token may have expired - try one silent refresh, then retry
+        const newToken = await this.refreshTokens();
+        if (newToken) {
+          return this.request<T>(endpoint, options, true);
+        }
+      }
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({
@@ -74,6 +116,46 @@ class ApiClient {
   delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: 'DELETE' });
   }
+
+  /** Multipart file upload (bypasses the JSON content-type of `request`). */
+  async upload<T>(
+    endpoint: string,
+    formData: FormData,
+    isRetry = false
+  ): Promise<ApiResponse<T>> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const headers = new Headers();
+    const token = useAuthStore.getState().token;
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (response.status === 401 && !isRetry) {
+        const newToken = await this.refreshTokens();
+        if (newToken) {
+          return this.upload<T>(endpoint, formData, true);
+        }
+      }
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: response.statusText }));
+        return { error: typeof error.detail === 'string' ? error.detail : error.error || 'Upload failed' };
+      }
+
+      const data = await response.json();
+      return { data };
+    } catch {
+      return { error: 'Network error' };
+    }
+  }
 }
 
 export const api = new ApiClient();
@@ -83,12 +165,18 @@ export const authApi = {
   register: (data: { email: string; full_name: string; password: string; role?: string }) =>
     api.post<User>('/auth/register', data),
 
-  login: async (data: { email: string; password: string }): Promise<ApiResponse<{ user: User; access_token: string }>> => {
+  login: async (data: { email: string; password: string }): Promise<ApiResponse<{ user: User; access_token: string; refresh_token: string }>> => {
     const response = await api.post<{ access_token: string; refresh_token: string; token_type: string }>('/auth/login', data);
     if (!response.data) return { error: response.error || 'Unable to sign in' };
     const userResponse = await authApi.getCurrentUser(response.data.access_token);
     if (!userResponse.data) return { error: userResponse.error || 'Unable to load your account' };
-    return { data: { user: userResponse.data, access_token: response.data.access_token } };
+    return {
+      data: {
+        user: userResponse.data,
+        access_token: response.data.access_token,
+        refresh_token: response.data.refresh_token,
+      },
+    };
   },
 
   logout: () => api.post<{ message: string }>('/auth/logout', {}),
@@ -130,10 +218,11 @@ export const userApi = {
 
 // Course endpoints
 export const courseApi = {
-  list: (params?: { skip?: number; limit?: number }) => {
+  list: (params?: { skip?: number; limit?: number; featured?: boolean }) => {
     const query = new URLSearchParams();
     if (params?.skip !== undefined) query.set('skip', String(params.skip));
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    if (params?.featured !== undefined) query.set('featured', String(params.featured));
     return api.get<Array<{
       id: string;
       title: string;
@@ -145,6 +234,9 @@ export const courseApi = {
       description?: string | null;
       level: string;
       rating_average: number;
+      cover_image_url?: string | null;
+      is_featured?: boolean;
+      instructor_name?: string | null;
     }>>(`/courses${query.size ? `?${query.toString()}` : ''}`);
   },
 
@@ -286,7 +378,18 @@ export const quizApi = {
   delete: (id: string) =>
     api.delete<{ message: string }>(`/courses/quizzes/${id}`),
 
-  submitAttempt: (quizId: string, answers: Array<Record<string, unknown>>) =>
+  startAttempt: (quizId: string) =>
+    api.post<{
+      attempt_id: string;
+      attempt_number: number;
+      started_at: string;
+      time_limit_seconds: number | null;
+      remaining_seconds: number | null;
+      max_attempts: number;
+      attempts_used: number;
+    }>(`/courses/quizzes/${quizId}/start`, {}),
+
+  submitAttempt: (quizId: string, answers: Array<Record<string, unknown>>, attemptId?: string | null) =>
     api.post<{
       attempt_id: string;
       score: number;
@@ -296,7 +399,7 @@ export const quizApi = {
       total_points: number;
       earned_points: number;
       feedback: string | null;
-    }>(`/courses/quizzes/${quizId}/attempt`, { answers }),
+    }>(`/courses/quizzes/${quizId}/attempt`, attemptId ? { answers, attempt_id: attemptId } : { answers }),
 
   getMyAttempts: (quizId: string) =>
     api.get<Array<{
@@ -522,6 +625,30 @@ export const lessonApi = {
 
   delete: (id: string) =>
     api.delete<{ message: string }>(`/courses/lessons/${id}`),
+
+  getProgress: (courseId: string) =>
+    api.get<{
+      course_id: string;
+      enrollment_id: string;
+      progress_percent: number;
+      completed_lessons: number;
+      total_lessons: number;
+      completed_lesson_ids: string[];
+      status: string;
+      last_accessed_at: string | null;
+    }>(`/courses/${courseId}/progress`),
+
+  markComplete: (lessonId: string) =>
+    api.post<{
+      course_id: string;
+      enrollment_id: string;
+      lesson_id: string;
+      progress_percent: number;
+      completed_lessons: number;
+      total_lessons: number;
+      completed_lesson_ids: string[];
+      status: string;
+    }>(`/courses/lessons/${lessonId}/complete`, {}),
 };
 
 // Review endpoints
@@ -588,5 +715,55 @@ export const reviewApi = {
       is_featured: boolean;
       created_at: string;
     } | null>(`/courses/${courseId}/reviews/my`),
+};
+
+// File upload endpoints
+export const fileApi = {
+  upload: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.upload<{
+      file_url: string;
+      file_name: string;
+      file_size_bytes: number;
+      content_type: string | null;
+    }>('/files/upload', formData);
+  },
+};
+
+// Public platform statistics (no auth required)
+export const platformApi = {
+  getStats: () =>
+    api.get<{
+      published_courses: number;
+      learners: number;
+      enrollments: number;
+    }>('/dashboard/platform'),
+};
+
+// Dashboard statistics
+export const dashboardApi = {
+  getStats: () =>
+    api.get<{
+      role: string;
+      // admin
+      total_users?: number;
+      active_users?: number;
+      total_courses?: number;
+      published_courses?: number;
+      total_enrollments?: number;
+      completed_enrollments?: number;
+      avg_progress?: number;
+      revenue_cents?: number;
+      // instructor
+      students_taught?: number;
+      avg_rating?: number;
+      pending_submissions?: number;
+      // student
+      enrolled_courses?: number;
+      completed_courses?: number;
+      hours_learned?: number;
+      pending_assignments?: number;
+    }>('/dashboard/stats'),
 };
 

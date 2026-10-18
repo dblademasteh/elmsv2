@@ -48,7 +48,7 @@ export default function RegisterPage() {
         try {
           const loginResponse = await authApi.login({ email: data.email, password: data.password })
           if (loginResponse.data) {
-            login(loginResponse.data.user, loginResponse.data.access_token)
+            login(loginResponse.data.user, loginResponse.data.access_token, loginResponse.data.refresh_token)
             router.push("/")
           } else {
             router.push("/login")

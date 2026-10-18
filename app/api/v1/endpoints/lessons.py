@@ -10,6 +10,8 @@ from app.crud.lesson import (
     delete_lesson,
     reorder_lessons,
 )
+from app.crud.enrollment import get_enrollment_by_user_and_course
+from app.crud.lesson_progress import mark_lesson_complete, get_course_progress as get_progress
 from app.db.database import get_db
 from app.api.v1.endpoints.users import get_current_user_from_token
 from typing import List
@@ -228,3 +230,54 @@ async def reorder_course_lessons(
 
     await reorder_lessons(db, course_id, lesson_ids)
     return {"message": "Lessons reordered successfully", "course_id": str(course_id)}
+
+
+@router.post("/lessons/{lesson_id}/complete", response_model=dict)
+async def mark_lesson_completed(
+    lesson_id: uuid.UUID,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer),
+    db: get_db = Depends(),
+):
+    """Mark a lesson as completed and persist course progress (enrolled students)."""
+    user = await _get_current_user(credentials, db)
+
+    lesson = await get_lesson_by_id(db, lesson_id)
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    if not lesson.is_published and user.role == "student":
+        raise HTTPException(status_code=403, detail="This lesson is not available")
+
+    enrollment = await get_enrollment_by_user_and_course(db, user.id, lesson.course_id)
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You must be enrolled in this course")
+
+    result = await mark_lesson_complete(db, enrollment.id, lesson_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    return result
+
+
+@router.get("/{course_id}/progress", response_model=dict)
+async def get_course_progress_endpoint(
+    course_id: uuid.UUID,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer),
+    db: get_db = Depends(),
+):
+    """Get the current user's persisted progress for a course."""
+    user = await _get_current_user(credentials, db)
+
+    enrollment = await get_enrollment_by_user_and_course(db, user.id, course_id)
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You must be enrolled in this course")
+
+    progress = await get_progress(db, enrollment.id, course_id)
+    return {
+        "course_id": str(course_id),
+        "enrollment_id": str(enrollment.id),
+        "progress_percent": enrollment.progress_percent or 0.0,
+        "completed_lessons": progress["completed_lessons"],
+        "total_lessons": progress["total_lessons"],
+        "completed_lesson_ids": [str(lid) for lid in progress["completed_lesson_ids"]],
+        "status": enrollment.status,
+        "last_accessed_at": enrollment.last_accessed_at.isoformat() if enrollment.last_accessed_at else None,
+    }

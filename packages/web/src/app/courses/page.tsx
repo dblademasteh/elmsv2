@@ -35,10 +35,15 @@ function CoursesContent() {
     loadCourses()
   }, [])
 
-  // Sync URL search param to local state
+  // Sync URL search params to local state
   useEffect(() => {
     const q = searchParams.get("q")
     if (q) setSearch(q)
+    const lvl = searchParams.get("level")
+    if (lvl) {
+      const match = LEVELS.find((l) => l.toLowerCase() === lvl.toLowerCase())
+      if (match) setLevel(match)
+    }
   }, [searchParams])
 
   async function loadCourses() {

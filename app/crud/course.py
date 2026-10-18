@@ -2,7 +2,8 @@
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.course import Course
-from typing import List, Optional
+from app.models.user import User
+from typing import List, Optional, Tuple
 import uuid
 from datetime import datetime
 
@@ -20,15 +21,24 @@ async def get_course_by_id(db: AsyncSession, course_id: uuid.UUID) -> Optional[C
     )
     return result.scalar_one_or_none()
 
-async def get_courses(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[Course]:
-    result = await db.execute(
-        select(Course)
+async def get_courses(
+    db: AsyncSession, skip: int = 0, limit: int = 100, featured: Optional[bool] = None
+) -> List[Tuple[Course, Optional[str]]]:
+    """List published public courses with instructor names.
+
+    Returns (course, instructor_name) tuples ordered by popularity.
+    """
+    stmt = (
+        select(Course, User.full_name)
+        .outerjoin(User, Course.instructor_id == User.id)
         .where(Course.status == "published", Course.is_private.is_(False))
-        .order_by(desc(Course.enrollment_count), Course.title)
-        .offset(max(skip, 0))
-        .limit(min(max(limit, 1), 100))
     )
-    return result.scalars().all()
+    if featured is not None:
+        stmt = stmt.where(Course.is_featured.is_(featured))
+    stmt = stmt.order_by(desc(Course.enrollment_count), Course.title)
+    stmt = stmt.offset(max(skip, 0)).limit(min(max(limit, 1), 100))
+    result = await db.execute(stmt)
+    return [(row[0], row[1]) for row in result.all()]
 
 async def create_course(
     db: AsyncSession,

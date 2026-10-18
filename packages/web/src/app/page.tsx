@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   ArrowRight,
   BookOpen,
@@ -11,11 +12,16 @@ import {
   Globe,
   BarChart3,
   Clock,
+  Search,
+  Star,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { courseApi } from "@/lib/api"
+import { Input } from "@/components/ui/input"
+import { courseApi, platformApi } from "@/lib/api"
+import { useAuthStore } from "@/store/auth"
 import { LandingAppBar } from "@/components/layout/landing-appbar"
+import { LandingFooter } from "@/components/layout/landing-footer"
 
 type Course = {
   id: string
@@ -27,6 +33,9 @@ type Course = {
   enrollment_count: number
   level: string
   rating_average: number
+  cover_image_url?: string | null
+  is_featured?: boolean
+  instructor_name?: string | null
 }
 
 type Feature = {
@@ -87,6 +96,7 @@ const testimonials: Testimonial[] = [
 ]
 
 function formatPrice(cents: number, currency: string) {
+  if (!cents) return "Free"
   return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency: currency || "USD",
@@ -94,19 +104,31 @@ function formatPrice(cents: number, currency: string) {
 }
 
 export default function HomePage() {
+  const router = useRouter()
+  const { isAuthenticated, user } = useAuthStore()
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [platform, setPlatform] = useState<{
+    published_courses: number
+    learners: number
+    enrollments: number
+  } | null>(null)
 
   useEffect(() => {
     let active = true
 
-    courseApi.list({ limit: 4 }).then((response) => {
+    Promise.all([
+      courseApi.list({ limit: 4, featured: true }),
+      courseApi.list({ limit: 4 }),
+    ]).then(([featuredResponse, listResponse]) => {
       if (!active) return
-      if (response.data) {
-        setCourses(response.data)
-      } else {
+      if (!featuredResponse.data && !listResponse.data) {
         setLoadError(true)
+      } else {
+        const featured = featuredResponse.data ?? []
+        setCourses(featured.length > 0 ? featured : listResponse.data ?? [])
       }
       setLoading(false)
     }).catch(() => {
@@ -117,6 +139,25 @@ export default function HomePage() {
 
     return () => { active = false }
   }, [])
+
+  useEffect(() => {
+    let active = true
+
+    platformApi.getStats().then((response) => {
+      if (!active) return
+      if (response.data) setPlatform(response.data)
+    }).catch(() => {
+      // Stats are decorative; ignore failures
+    })
+
+    return () => { active = false }
+  }, [])
+
+  function handleSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const q = searchQuery.trim()
+    router.push(q ? `/courses?q=${encodeURIComponent(q)}` : "/courses")
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -139,15 +180,36 @@ export default function HomePage() {
             <p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
               Explore available courses, compare the details, and choose what you want to learn next.
             </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" asChild className="h-12 rounded-lg px-6">
+            <form className="mt-9 flex flex-col gap-3 sm:flex-row" onSubmit={handleSearch}>
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search courses..."
+                  aria-label="Search courses"
+                  className="h-12 rounded-lg pl-10"
+                />
+              </div>
+              <Button type="submit" size="lg" className="h-12 rounded-lg px-6">
+                Search
+              </Button>
+            </form>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <Button size="lg" variant="outline" asChild className="h-12 rounded-lg px-6">
                 <Link href="/courses">
                   Browse courses{" "}
                   <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" asChild className="h-12 rounded-lg px-6">
-                <Link href="/register">Create an account</Link>
+              <Button size="lg" variant="ghost" asChild className="h-12 rounded-lg px-6">
+                <Link href={isAuthenticated() && user ? "/dashboard" : "/register"}>
+                  {isAuthenticated() && user ? "Go to dashboard" : "Create an account"}
+                </Link>
               </Button>
             </div>
             <div className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-sm text-muted-foreground">
@@ -158,6 +220,22 @@ export default function HomePage() {
                 </span>
               ))}
             </div>
+            {platform && (
+              <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+                <span>
+                  <strong className="font-semibold text-foreground">{platform.published_courses}</strong>{" "}
+                  published courses
+                </span>
+                <span>
+                  <strong className="font-semibold text-foreground">{platform.learners}</strong>{" "}
+                  learners
+                </span>
+                <span>
+                  <strong className="font-semibold text-foreground">{platform.enrollments}</strong>{" "}
+                  enrollments
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="relative mx-auto w-full max-w-lg lg:ml-auto">
@@ -205,7 +283,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+      <section id="features" className="mx-auto max-w-7xl scroll-mt-20 px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
             Everything you need to learn
@@ -231,7 +309,7 @@ export default function HomePage() {
       </section>
 
       {/* Testimonials */}
-      <section className="border-t border-border bg-muted/30 py-20">
+      <section id="testimonials" className="scroll-mt-20 border-t border-border bg-muted/30 py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -323,16 +401,38 @@ export default function HomePage() {
                   href={`/courses/${course.id}`}
                   className="flex h-full flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                 >
-                  <div className="flex aspect-[16/10] items-end bg-gradient-to-br from-primary/15 via-muted to-primary/5 p-5">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-background/80 bg-card/90 text-primary shadow-sm">
+                  <div className="relative flex aspect-[16/10] items-end bg-gradient-to-br from-primary/15 via-muted to-primary/5 p-5">
+                    {course.cover_image_url && (
+                      <div
+                        aria-hidden="true"
+                        className="absolute inset-0 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${course.cover_image_url})` }}
+                      />
+                    )}
+                    {course.is_featured && (
+                      <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground shadow-sm">
+                        <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+                        Featured
+                      </span>
+                    )}
+                    <div className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-background/80 bg-card/90 text-primary shadow-sm">
                       <BookOpen className="h-5 w-5" aria-hidden="true" />
                     </div>
                   </div>
                   <CardHeader className="flex-1 p-5 pb-3">
                     <div className="mb-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
                       <span className="capitalize">{course.level}</span>
+                      <span className="inline-flex items-center gap-1">
+                        <Star className="h-3.5 w-3.5 fill-current text-primary" aria-hidden="true" />
+                        {course.rating_average > 0 ? course.rating_average.toFixed(1) : "New"}
+                      </span>
                       <span>{course.enrollment_count} enrolled</span>
                     </div>
+                    {course.instructor_name && (
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        Taught by {course.instructor_name}
+                      </p>
+                    )}
                     <CardTitle className="text-base leading-snug transition-colors group-hover:text-primary">
                       {course.title}
                     </CardTitle>
@@ -369,7 +469,9 @@ export default function HomePage() {
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row justify-center">
             <Button size="lg" variant="secondary" asChild className="h-12 rounded-lg px-8">
-              <Link href="/register">Get started for free</Link>
+              <Link href={isAuthenticated() && user ? "/dashboard" : "/register"}>
+                {isAuthenticated() && user ? "Go to dashboard" : "Get started for free"}
+              </Link>
             </Button>
             <Button
               size="lg"
@@ -385,6 +487,8 @@ export default function HomePage() {
           </p>
         </div>
       </section>
+
+      <LandingFooter />
     </div>
   )
 }

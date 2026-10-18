@@ -5,7 +5,7 @@ from app.schemas.course import CourseResponse, CourseListResponse, CourseDetailR
 from app.crud.course import get_course_by_id, get_courses, create_course, update_course, archive_course
 from app.db.database import get_db
 from app.api.v1.endpoints.users import get_current_user_from_token
-from typing import List
+from typing import List, Optional
 import uuid
 
 router = APIRouter()
@@ -30,8 +30,13 @@ async def get_current_instructor_or_admin(credentials: HTTPAuthorizationCredenti
 
 
 @router.get("/", response_model=List[CourseListResponse])
-async def list_courses(skip: int = 0, limit: int = 100, db: get_db = Depends()):
-    courses = await get_courses(db, skip, limit)
+async def list_courses(
+    skip: int = 0,
+    limit: int = 100,
+    featured: Optional[bool] = None,
+    db: get_db = Depends(),
+):
+    rows = await get_courses(db, skip, limit, featured=featured)
     return [
         CourseListResponse(
             id=c.id,
@@ -44,7 +49,10 @@ async def list_courses(skip: int = 0, limit: int = 100, db: get_db = Depends()):
             description=c.description,
             level=c.level,
             rating_average=c.rating_average or 0,
-        ) for c in courses
+            cover_image_url=c.cover_image_url,
+            is_featured=c.is_featured,
+            instructor_name=instructor_name,
+        ) for c, instructor_name in rows
     ]
 
 @router.get("/{course_id}", response_model=CourseResponse)

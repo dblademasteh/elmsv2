@@ -18,7 +18,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { useAuthStore } from "@/store/auth"
-import { courseApi } from "@/lib/api"
+import { courseApi, dashboardApi } from "@/lib/api"
+
+type DashboardStats = {
+  role: string
+  total_users?: number
+  active_users?: number
+  total_courses?: number
+  published_courses?: number
+  total_enrollments?: number
+  completed_enrollments?: number
+  avg_progress?: number
+  revenue_cents?: number
+  students_taught?: number
+  avg_rating?: number
+  pending_submissions?: number
+  enrolled_courses?: number
+  completed_courses?: number
+  hours_learned?: number
+  pending_assignments?: number
+}
 
 type DashboardCourse = {
   id: string
@@ -201,14 +220,40 @@ function CourseCard({ course }: { course: DashboardCourse }) {
   )
 }
 
+const fmt = (value?: number) => (value ?? 0).toLocaleString()
+const fmt1 = (value?: number) => (value ?? 0).toFixed(1)
+
 export default function DashboardPage() {
   const user = useAuthStore((state) => state.user)
   const [courses, setCourses] = useState<DashboardCourse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [statsData, setStatsData] = useState<DashboardStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
 
   useEffect(() => setMounted(true), [])
+
+  useEffect(() => {
+    let active = true
+
+    dashboardApi
+      .getStats()
+      .then((response) => {
+        if (!active) return
+        if (response.data) {
+          setStatsData(response.data)
+        }
+        setStatsLoading(false)
+      })
+      .catch(() => {
+        if (active) setStatsLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -235,67 +280,73 @@ export default function DashboardPage() {
     }
   }, [])
 
-  // Role-based stats (memoized for perf)
+  // Role-based stats from the real aggregation API
   const stats = useMemo<StatCard[]>(() => {
-    const baseStats: StatCard[] = [
-      {
-        title: "Total Courses",
-        value: "12",
-        change: "+2 this month",
-        icon: BookOpen,
-        trend: "up",
-      },
-    ]
+    if (!statsData) return []
 
-    if (user?.role === "admin") {
+    if (statsData.role === "admin") {
       return [
-        ...baseStats,
+        {
+          title: "Total Courses",
+          value: fmt(statsData.total_courses),
+          change: `${fmt(statsData.published_courses)} published`,
+          icon: BookOpen,
+          trend: "neutral",
+        },
         {
           title: "Active Users",
-          value: "1,284",
-          change: "+12% from last month",
+          value: fmt(statsData.active_users),
+          change: `of ${fmt(statsData.total_users)} accounts`,
           icon: Users,
-          trend: "up",
+          trend: "neutral",
         },
         {
-          title: "Completions",
-          value: "342",
-          change: "+8% from last month",
-          icon: GraduationCap,
-          trend: "up",
-        },
-        {
-          title: "Revenue",
-          value: "$5,420",
-          change: "+15% from last month",
-          icon: DollarSign,
-          trend: "up",
-        },
-      ]
-    }
-
-    if (user?.role === "instructor") {
-      return [
-        ...baseStats,
-        {
-          title: "Students Taught",
-          value: "342",
-          change: "+5% from last month",
-          icon: UserPlus,
-          trend: "up",
-        },
-        {
-          title: "Completions",
-          value: "89",
-          change: "+3% from last month",
+          title: "Enrollments",
+          value: fmt(statsData.total_enrollments),
+          change: `${fmt(statsData.completed_enrollments)} completed`,
           icon: GraduationCap,
           trend: "neutral",
         },
         {
+          title: "Enrolled Value",
+          value: new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(
+            (statsData.revenue_cents ?? 0) / 100
+          ),
+          change: "across paid courses",
+          icon: DollarSign,
+          trend: "neutral",
+        },
+      ]
+    }
+
+    if (statsData.role === "instructor") {
+      return [
+        {
+          title: "My Courses",
+          value: fmt(statsData.total_courses),
+          change: `${fmt(statsData.published_courses)} published`,
+          icon: BookOpen,
+          trend: "neutral",
+        },
+        {
+          title: "Students Taught",
+          value: fmt(statsData.students_taught),
+          change: `${fmt(statsData.total_enrollments)} enrollments`,
+          icon: UserPlus,
+          trend: "neutral",
+        },
+        {
           title: "Avg. Rating",
-          value: "4.8",
-          change: "Stable",
+          value: fmt1(statsData.avg_rating),
+          change: "across rated courses",
           icon: TrendingUp,
+          trend: "neutral",
+        },
+        {
+          title: "Pending Reviews",
+          value: fmt(statsData.pending_submissions),
+          change: "submissions to grade",
+          icon: GraduationCap,
           trend: "neutral",
         },
       ]
@@ -304,34 +355,34 @@ export default function DashboardPage() {
     return [
       {
         title: "Enrolled Courses",
-        value: "3",
-        change: "In progress",
+        value: fmt(statsData.enrolled_courses),
+        change: `${fmt(statsData.completed_courses)} completed`,
         icon: BookOpen,
         trend: "neutral",
       },
       {
         title: "Hours Learned",
-        value: "24.5",
-        change: "+2.1 this week",
+        value: fmt1(statsData.hours_learned),
+        change: "across your courses",
         icon: Clock,
-        trend: "up",
+        trend: "neutral",
       },
       {
-        title: "Completed",
-        value: "1",
-        change: "1 course done",
+        title: "Avg. Progress",
+        value: `${fmt1(statsData.avg_progress)}%`,
+        change: "across enrolled courses",
         icon: GraduationCap,
         trend: "neutral",
       },
       {
-        title: "Current Streak",
-        value: "5 days",
-        change: "Keep going!",
+        title: "Pending Assignments",
+        value: fmt(statsData.pending_assignments),
+        change: "awaiting grades",
         icon: TrendingUp,
-        trend: "up",
+        trend: "neutral",
       },
     ]
-  }, [user?.role])
+  }, [statsData])
 
   const firstName = user?.full_name?.trim().split(/\s+/)[0] || "there"
 
@@ -400,7 +451,7 @@ export default function DashboardPage() {
 
           {/* Stats Grid */}
           <section aria-label="Statistics" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {isLoading
+            {statsLoading
               ? Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
               : stats.map((stat) => <StatCard key={stat.title} stat={stat} />)}
           </section>

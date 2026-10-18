@@ -5,8 +5,10 @@ import { User } from '@/types';
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isLoading: boolean;
-  login: (user: User, token: string) => void;
+  login: (user: User, token: string, refreshToken?: string | null) => void;
+  setTokens: (token: string, refreshToken?: string | null) => void;
   logout: () => void;
   setUser: (user: User) => void;
   setLoading: (loading: boolean) => void;
@@ -18,14 +20,19 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isLoading: false,
 
-      login: (user: User, token: string) => {
-        set({ user, token, isLoading: false });
+      login: (user: User, token: string, refreshToken: string | null = null) => {
+        set({ user, token, refreshToken, isLoading: false });
+      },
+
+      setTokens: (token: string, refreshToken: string | null = null) => {
+        set({ token, refreshToken });
       },
 
       logout: () => {
-        set({ user: null, token: null, isLoading: false });
+        set({ user: null, token: null, refreshToken: null, isLoading: false });
       },
 
       setUser: (user: User) => {
@@ -43,7 +50,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'lms-auth-storage',
-      partialize: (state) => ({ user: state.user, token: state.token }),
+      partialize: (state) => ({ user: state.user, token: state.token, refreshToken: state.refreshToken }),
     }
   )
 );

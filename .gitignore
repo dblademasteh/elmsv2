@@ -24,3 +24,6 @@ dist/
 .impeccable/
 .DS_Store
 Thumbs.db
+
+# File uploads (served by FastAPI)
+uploads/

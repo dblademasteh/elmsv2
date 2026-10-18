@@ -43,7 +43,7 @@ export default function LoginPage() {
         return
       }
       if (response.data) {
-        login(response.data.user, response.data.access_token)
+        login(response.data.user, response.data.access_token, response.data.refresh_token)
         router.push("/dashboard")
       }
     } catch {

@@ -44,6 +44,9 @@ class CourseListResponse(BaseModel):
     description: Optional[str] = None
     level: str
     rating_average: float = 0
+    cover_image_url: Optional[str] = None
+    is_featured: bool = False
+    instructor_name: Optional[str] = None
 
     class Config:
         from_attributes = True

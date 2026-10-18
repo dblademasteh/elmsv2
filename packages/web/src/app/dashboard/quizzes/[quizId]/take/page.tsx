@@ -43,6 +43,7 @@ export default function TakeQuizPage() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<any>(null)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
+  const [attemptId, setAttemptId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -63,8 +64,18 @@ export default function TakeQuizPage() {
       const resp = await quizApi.getById(quizId)
       if (resp.data) {
         setQuiz(resp.data as unknown as Quiz)
-        if (resp.data.time_limit_seconds && resp.data.time_limit_seconds > 0) {
-          setTimeLeft(resp.data.time_limit_seconds)
+
+        // Start (or resume) an attempt - the server enforces time limits
+        const startResp = await quizApi.startAttempt(quizId)
+        if (startResp.data) {
+          setAttemptId(startResp.data.attempt_id)
+          if (startResp.data.remaining_seconds !== null && startResp.data.remaining_seconds !== undefined) {
+            setTimeLeft(startResp.data.remaining_seconds)
+          } else if (resp.data.time_limit_seconds && resp.data.time_limit_seconds > 0) {
+            setTimeLeft(resp.data.time_limit_seconds)
+          }
+        } else if (startResp.error) {
+          setError(startResp.error)
         }
       } else if (resp.error) {
         setError(resp.error)
@@ -109,7 +120,7 @@ export default function TakeQuizPage() {
         : undefined,
     }))
 
-    const resp = await quizApi.submitAttempt(quizId, answerList)
+    const resp = await quizApi.submitAttempt(quizId, answerList, attemptId)
     if (resp.data) {
       setResult(resp.data)
     } else {

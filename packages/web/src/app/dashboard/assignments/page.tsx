@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
-import { assignmentApi, enrollmentApi } from "@/lib/api"
+import { assignmentApi, enrollmentApi, fileApi } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -59,9 +59,9 @@ export default function StudentAssignmentsPage() {
   const [loading, setLoading] = useState(true)
   const [submittingId, setSubmittingId] = useState<string | null>(null)
   const [showSubmitModal, setShowSubmitModal] = useState<CombinedAssignment | null>(null)
-  const [fileUrl, setFileUrl] = useState("")
-  const [fileName, setFileName] = useState("")
-  const [fileSize, setFileSize] = useState(0)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [externalUrl, setExternalUrl] = useState("")
+  const [fileError, setFileError] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
@@ -135,23 +135,72 @@ export default function StudentAssignmentsPage() {
     return new Date(a.dueDate) < new Date() && (!a.submission || a.submission.status === "draft")
   }
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] || null
+    setFileError(null)
+    if (!file) {
+      setSelectedFile(null)
+      return
+    }
+    if (showSubmitModal) {
+      const allowed = (showSubmitModal.allowedFileTypes || []).map((t) => t.toLowerCase().replace(/^\./, ""))
+      const ext = file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : ""
+      if (allowed.length > 0 && ext && !allowed.includes(ext)) {
+        setFileError(`.${ext} files are not allowed for this assignment`)
+        setSelectedFile(null)
+        return
+      }
+      if (showSubmitModal.maxFileSizeMb > 0 && file.size > showSubmitModal.maxFileSizeMb * 1024 * 1024) {
+        setFileError(`File exceeds the ${showSubmitModal.maxFileSizeMb} MB limit`)
+        setSelectedFile(null)
+        return
+      }
+    }
+    setSelectedFile(file)
+  }
+
   async function handleSubmit(a: CombinedAssignment) {
     setShowSubmitModal(a)
-    setFileUrl("")
-    setFileName("")
-    setFileSize(0)
+    setSelectedFile(null)
+    setExternalUrl("")
+    setFileError(null)
   }
 
   async function confirmSubmit() {
     if (!showSubmitModal) return
-    if (!fileUrl.trim()) {
-      alert("Please enter a file URL")
+
+    let url = ""
+    let name = ""
+    let size = 0
+
+    if (selectedFile) {
+      url = "" // filled after upload
+    } else if (externalUrl.trim()) {
+      url = externalUrl.trim()
+      name = url.split("/").pop() || "submission"
+    } else {
+      setFileError("Choose a file to upload, or enter a file URL")
       return
     }
 
     setSubmittingId(showSubmitModal.assignmentId)
     try {
-      await assignmentApi.submit(showSubmitModal.assignmentId, fileUrl, fileName, fileSize)
+      if (selectedFile) {
+        const uploadResp = await fileApi.upload(selectedFile)
+        if (uploadResp.error || !uploadResp.data) {
+          setFileError(uploadResp.error || "Upload failed")
+          return
+        }
+        url = uploadResp.data.file_url
+        name = uploadResp.data.file_name
+        size = uploadResp.data.file_size_bytes
+      }
+
+      const resp = await assignmentApi.submit(showSubmitModal.assignmentId, url, name, size)
+      if (resp.error) {
+        setFileError(resp.error)
+        return
+      }
       setShowSubmitModal(null)
       await loadData()
     } catch (err) {
@@ -260,42 +309,40 @@ export default function StudentAssignmentsPage() {
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">File URL *</label>
+                <label className="block text-sm font-medium mb-1">Upload file *</label>
                 <input
-                  type="url"
-                  value={fileUrl}
-                  onChange={(e) => setFileUrl(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
-                  placeholder="Enter the URL where your file is hosted"
+                  type="file"
+                  onChange={handleFileChange}
+                  className="w-full text-sm border border-border rounded-md bg-background p-2 file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Allowed types: {showSubmitModal.allowedFileTypes.join(", ")}
+                  Allowed types: {showSubmitModal.allowedFileTypes.join(", ") || "any"}
                   &nbsp;|&nbsp; Max size: {showSubmitModal.maxFileSizeMb} MB
                 </p>
+                {selectedFile && (
+                  <p className="text-xs text-green-600 mt-1">
+                    {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB) ready to upload
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">File Name</label>
+                <label className="block text-sm font-medium mb-1">Or submit a link instead</label>
                 <input
-                  type="text"
-                  value={fileName}
-                  onChange={(e) => setFileName(e.target.value)}
+                  type="url"
+                  value={externalUrl}
+                  onChange={(e) => {
+                    setExternalUrl(e.target.value)
+                    setFileError(null)
+                  }}
                   className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
-                  placeholder="e.g. my-assignment.pdf"
+                  placeholder="https://example.com/my-assignment.pdf"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">File Size (bytes)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={fileSize || ""}
-                  onChange={(e) => setFileSize(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
-                  placeholder="0"
-                />
-              </div>
+              {fileError && (
+                <p className="text-sm text-destructive">{fileError}</p>
+              )}
 
               {showSubmitModal.instructions && (
                 <div className="p-3 bg-muted rounded-md">

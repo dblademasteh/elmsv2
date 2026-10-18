@@ -108,22 +108,24 @@ Ordered by benchmark impact per unit of effort:
 
 | # | Gap | Why it matters | Rough effort |
 |---|---|---|---|
-| 1 | **Progress persistence** — wire the existing `update_enrollment_progress()` to a `POST /lessons/{id}/complete` endpoint + learn-page call | The #1 LMS metric; CRUD already written (dead code) | XS (hours) |
-| 2 | **File upload endpoint** (local disk or S3) for assignment submissions | Submissions as raw URLs disqualify against every competitor | S |
-| 3 | **Gradebook** — aggregate quiz + assignment scores per enrollment, student + instructor view, CSV export | Core expectation; score data already exists | M |
-| 4 | **Fix stub dashboard pages** (analytics, content, enrollments) or remove them; add real aggregation endpoints | Fake UI is a credibility tax in any comparison | M |
-| 5 | **Course authoring UI** (create/edit/publish) — API methods already in `lib/api.ts`, uncalled | Blocks instructors from actually using the product | M |
-| 6 | **Notifications + announcements** (even in-app only, no SMTP) | Table-less; communication is table stakes | M |
-| 7 | **Discussions** — tables already in `migrations/000001` | Schema is ahead of implementation | M |
-| 8 | **Auth hardening** — `/auth/refresh` exchange, password reset, lockout (columns exist), logout | Security baseline | S–M |
-| 9 | **Quiz enforcement** — time limits, randomization, ownership checks on create/delete | Flags exist but are lies right now | S |
-| 10 | **Modules/sections** for course structure + categories/search | Catalog scalability | M |
-| 11 | **Migrations (alembic) + tests + CI** | Required before any production claim | M |
-| 12 | **LTI 1.3 + SCORM import** | Only path to interop parity | L |
-| 13 | **i18n (next-intl) + accessibility audit** | Parity with all four competitors | L |
-| 14 | **Mobile/PWA** | Moodle's offline app is a documented differentiator | L |
+| 1 | ✅ **DONE** **Progress persistence** — new `lesson_progress` table + `POST /courses/lessons/{id}/complete` + `GET /courses/{id}/progress`, wired into the learn page (checkmarks + live progress bar) | The #1 LMS metric; was dead code | XS |
+| 2 | ✅ **DONE** **File upload endpoint** — `POST /files/upload` (extension allowlist, size limit, chunked to disk), static `/uploads` serving, file picker in the assignment submit modal | Submissions as raw URLs disqualify against every competitor | S |
+| 3 | **Gradebook** — aggregate quiz + assignment scores per enrollment, student + instructor view, CSV export ([#1](https://github.com/dblademasteh/elmsv2/issues/1)) | Core expectation; score data already exists | M |
+| 4 | ◐ **Half done** — real `GET /dashboard/stats` aggregation (role-aware) wired into the main dashboard's stat cards; stub pages (analytics, content, enrollments) still to fix or remove ([#2](https://github.com/dblademasteh/elmsv2/issues/2)) | Fake UI is a credibility tax in any comparison | M |
+| 5 | **Course authoring UI** (create/edit/publish) — API methods already in `lib/api.ts`, uncalled ([#3](https://github.com/dblademasteh/elmsv2/issues/3)) | Blocks instructors from actually using the product | M |
+| 6 | **Notifications + announcements** (even in-app only, no SMTP) ([#4](https://github.com/dblademasteh/elmsv2/issues/4)) | Table-less; communication is table stakes | M |
+| 7 | **Discussions** — tables already in `migrations/000001` ([#5](https://github.com/dblademasteh/elmsv2/issues/5)) | Schema is ahead of implementation | M |
+| 8 | ◐ **Half done** — `POST /auth/refresh` exchange (silent auto-refresh in the API client) + `POST /auth/logout` shipped; password reset and lockout still open ([#6](https://github.com/dblademasteh/elmsv2/issues/6)) | Security baseline | S–M |
+| 9 | ✅ **DONE** **Quiz enforcement** — `POST /courses/quizzes/{id}/start` attempt flow with server-side time-limit enforcement (+15s grace), server-side question randomization, ownership checks on create/delete | Flags exist but were lies before | S |
+| 10 | **Modules/sections** for course structure + categories/search ([#7](https://github.com/dblademasteh/elmsv2/issues/7)) | Catalog scalability | M |
+| 11 | **Migrations (alembic) + tests + CI** ([#8](https://github.com/dblademasteh/elmsv2/issues/8)) | Required before any production claim | M |
+| 12 | **LTI 1.3 + SCORM import** ([#9](https://github.com/dblademasteh/elmsv2/issues/9)) | Only path to interop parity | L |
+| 13 | **i18n (next-intl) + accessibility audit** ([#10](https://github.com/dblademasteh/elmsv2/issues/10)) | Parity with all four competitors | L |
+| 14 | **Mobile/PWA** ([#11](https://github.com/dblademasteh/elmsv2/issues/11)) | Moodle's offline app is a documented differentiator | L |
 
 **Deliberately out of scope for a small project:** proctoring, multi-tenancy, plugin marketplace, 20+ microservices parity with Open edX. Compete on simplicity, not breadth.
+
+> **Verification of the ✅/◐ items:** 21-test smoke suite run against a live `docker compose up` stack (all pass) covering refresh/logout, role-aware stats, persisted lesson progress incl. 100% auto-completion, multipart upload + served file + blocked extensions, and quiz start/time-limit/randomization/ownership flows. Frontend: `tsc --noEmit` clean and a clean `next build` (19/19 pages).
 
 ---
 
