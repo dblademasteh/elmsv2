@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { BookOpen, Loader2, Pencil, Plus, Rocket, Archive } from "lucide-react"
+import { BookOpen, Loader2, Pencil, Plus, Rocket, Archive, Search } from "lucide-react"
 
 type ManagedCourse = {
   id: string
@@ -76,6 +76,8 @@ export default function DashboardCoursesPage() {
   const [courses, setCourses] = useState<ManagedCourse[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<ManagedCourse | null>(null)
@@ -166,7 +168,9 @@ export default function DashboardCoursesPage() {
   async function togglePublish(course: ManagedCourse) {
     const next = course.status === "published" ? "draft" : "published"
     setBusyId(course.id)
-    await courseApi.update(course.id, { status: next })
+    setActionError(null)
+    const response = await courseApi.update(course.id, { status: next })
+    if (response.error) setActionError(response.error)
     setBusyId(null)
     load()
   }
@@ -176,10 +180,17 @@ export default function DashboardCoursesPage() {
       return
     }
     setBusyId(course.id)
-    await courseApi.archive(course.id)
+    setActionError(null)
+    const response = await courseApi.archive(course.id)
+    if (response.error) setActionError(response.error)
     setBusyId(null)
     load()
   }
+
+  const filtered = courses.filter((c) =>
+    c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.short_description || c.description || "").toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   if (!isManager) {
     // Students get a simple catalog-style view.
@@ -192,13 +203,35 @@ export default function DashboardCoursesPage() {
               <Link href="/courses">View Catalog</Link>
             </Button>
           </div>
-          {loading ? (
+        {actionError && (
+          <div role="alert" className="mb-4 rounded-lg border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {actionError}
+          </div>
+        )}
+
+        <Card className="mb-4 border-border">
+          <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="Search courses…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background pl-10 pr-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
+                aria-label="Search courses"
+              />
+            </div>
+          </div>
+        </Card>
+
+        {loading ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="h-48 rounded-xl border border-border bg-card" />
               ))}
             </div>
-          ) : courses.length === 0 ? (
+        ) : filtered.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-12 text-center text-muted-foreground">
               <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
               <p>No courses available.</p>
@@ -248,8 +281,17 @@ export default function DashboardCoursesPage() {
         </div>
 
         {loading ? (
-          <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden="true" />
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <div className="divide-y divide-border">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-6 py-4 animate-pulse">
+                  <div className="h-4 flex-1 rounded bg-muted" />
+                  <div className="h-4 w-20 rounded bg-muted" />
+                  <div className="h-4 w-16 rounded bg-muted" />
+                  <div className="h-4 w-12 rounded bg-muted" />
+                </div>
+              ))}
+            </div>
           </div>
         ) : loadError ? (
           <div className="rounded-xl border border-border bg-card p-12 text-center">
@@ -282,7 +324,7 @@ export default function DashboardCoursesPage() {
                 </tr>
               </thead>
               <tbody>
-                {courses.map((course) => (
+                {filtered.map((course) => (
                   <tr key={course.id} className="border-b last:border-0">
                     <td className="px-4 py-3">
                       <div className="font-medium text-foreground">
