@@ -2,10 +2,10 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Save, UserIcon, LockKeyhole, Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react"
+import { Save, UserIcon, UserRound, LockKeyhole, Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { authApi } from "@/lib/api"
@@ -125,7 +125,7 @@ export default function ProfilePage() {
         </div>
 
         {/* User avatar + basic info bar */}
-        <div className="mb-6 flex items-center gap-4 rounded-xl border border-border bg-card p-5">
+        <Card className="mb-6 flex items-center gap-4 border-border p-5">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-xl font-medium text-foreground">
             {user.full_name
               ?.split(" ")
@@ -137,10 +137,10 @@ export default function ProfilePage() {
             <p className="text-lg font-semibold text-foreground">{user.full_name}</p>
             <p className="text-sm text-muted-foreground">{user.email}</p>
           </div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
             {user.role}
           </span>
-        </div>
+        </Card>
 
         {/* Tabs */}
         <div className="mb-6 flex gap-1 rounded-lg bg-muted/40 p-1.5">
@@ -192,34 +192,42 @@ export default function ProfilePage() {
 
         {/* Profile Tab */}
         {activeTab === "profile" && (
-          <div className="space-y-5">
+          <Card className="border-border p-6">
+            <div className="space-y-5">
             <div>
               <Label htmlFor="full-name" className="text-sm font-medium">
                 Full name
               </Label>
-              <Input
-                id="full-name"
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Enter your full name"
-                maxLength={255}
-                className="mt-1.5"
-              />
+              <div className="relative mt-1.5">
+                <UserIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <input
+                  id="full-name"
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Your name"
+                  maxLength={255}
+                  autoComplete="name"
+                  className="h-12 w-full rounded-lg border border-input bg-background pl-11 pr-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
+                />
+              </div>
             </div>
 
             <div>
               <Label htmlFor="avatar-url" className="text-sm font-medium">
                 Avatar URL
               </Label>
-              <Input
-                id="avatar-url"
-                type="url"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://example.com/avatar.png"
-                className="mt-1.5"
-              />
+              <div className="relative mt-1.5">
+                <UserRound className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <input
+                  id="avatar-url"
+                  type="url"
+                  value={avatarUrl}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  placeholder="https://example.com/avatar.png"
+                  className="h-12 w-full rounded-lg border border-input bg-background pl-11 pr-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
+                />
+              </div>
               <p className="mt-1.5 text-xs text-muted-foreground">
                 Enter a URL to an image that will be used as your profile picture.
               </p>
@@ -244,27 +252,30 @@ export default function ProfilePage() {
                 ) : (
                   <Save className="h-4 w-4" aria-hidden="true" />
                 )}
-                {isSaving ? "Saving…" : "Save changes"}
-              </Button>
-            </div>
+              {isSaving ? "Saving…" : "Save changes"}
+            </Button>
           </div>
+          </div>
+        </Card>
         )}
 
         {/* Password Tab */}
         {activeTab === "password" && (
-          <div className="space-y-5">
+          <Card className="border-border p-6">
+            <div className="space-y-5">
             <div>
               <Label htmlFor="current-password" className="text-sm font-medium">
                 Current password
               </Label>
               <div className="relative mt-1.5">
+                <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                 <input
                   id="current-password"
                   type={showCurrent ? "text" : "password"}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Enter your current password"
-                  className="h-10 w-full rounded-md border border-input bg-background pr-12 pl-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
+                  className="h-12 w-full rounded-lg border border-input bg-background pr-12 pl-11 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
                   autoComplete="current-password"
                 />
                 <button
@@ -284,13 +295,14 @@ export default function ProfilePage() {
                 New password
               </Label>
               <div className="relative mt-1.5">
+                <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                 <input
                   id="new-password"
                   type={showNew ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter a new password (min 8 characters)"
-                  className="h-10 w-full rounded-md border border-input bg-background pr-12 pl-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
+                  className="h-12 w-full rounded-lg border border-input bg-background pr-12 pl-11 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
                   autoComplete="new-password"
                 />
                 <button
@@ -310,13 +322,14 @@ export default function ProfilePage() {
                 Confirm new password
               </Label>
               <div className="relative mt-1.5">
+                <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                 <input
                   id="confirm-password"
                   type={showConfirm ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm your new password"
-                  className="h-10 w-full rounded-md border border-input bg-background pr-12 pl-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
+                  className="h-12 w-full rounded-lg border border-input bg-background pr-12 pl-11 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
                   autoComplete="new-password"
                 />
                 <button
@@ -356,10 +369,11 @@ export default function ProfilePage() {
                 ) : (
                   <Save className="h-4 w-4" aria-hidden="true" />
                 )}
-                {isSavingPassword ? "Changing…" : "Save password"}
-              </Button>
-            </div>
+              {isSavingPassword ? "Changing…" : "Save password"}
+            </Button>
           </div>
+          </div>
+        </Card>
         )}
       </div>
     </DashboardLayout>
