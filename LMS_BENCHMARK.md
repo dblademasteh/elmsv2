@@ -27,7 +27,7 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | Capability | eLMS | Moodle | Canvas (OSS) | Open edX | Chamilo |
 |---|---|---|---|---|---|
 | **User auth (login/register/JWT)** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Password reset / email verify** | ❌ | ✅ | ✅ | ✅ | ✅ |
+| **Password reset / email verify** | ⚠️ password reset ✅ (no email delivery; dev-inline tokens); email verify ❌ | ✅ | ✅ | ✅ | ✅ |
 | **SSO / OAuth / LTI 1.3 login** | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Two-factor auth** | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Roles & permissions** | ⚠️ 3 fixed roles, inline checks | ✅ granular (site/course/activity) | ✅ roles + sub-accounts | ✅ complex roles | ✅ |
@@ -77,7 +77,7 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 
 | Area | eLMS completion (of its own scope) | vs. competitors |
 |---|---|---|
-| Auth & users | ~65% | Basic. No reset/verify/SSO/2FA/lockout (columns dead). |
+| Auth & users | ~80% | Reset + lockout shipped; no verify/SSO/2FA (verification needs email infra). |
 | Courses & catalog | ~85% | Authoring UI shipped (create/edit/publish/archive); no categories/search backend. |
 | Lessons/content | ~75% | Flat structure; no modules, no editor. |
 | Quizzes | ~75% | Works end-to-end but weakest vs. any competitor's question bank. |
@@ -115,7 +115,7 @@ Ordered by benchmark impact per unit of effort:
 | 5 | ✅ **DONE** **Course authoring UI** — "My Courses" management page on `/dashboard/courses`: create dialog (title/short description/description/level/price, featured flag for admins), inline edit dialog, publish/unpublish toggle, archive with confirm; drafts visible to their instructor via `?mine=true` | Blocks instructors from actually using the product | M |
 | 6 | **Notifications + announcements** (even in-app only, no SMTP) ([#4](https://github.com/dblademasteh/elmsv2/issues/4)) | Table-less; communication is table stakes | M |
 | 7 | **Discussions** — tables already in `migrations/000001` ([#5](https://github.com/dblademasteh/elmsv2/issues/5)) | Schema is ahead of implementation | M |
-| 8 | ◐ **Half done** — real `POST /auth/refresh` exchange (silent auto-refresh in the API client) + `POST /auth/logout` shipped; password reset and lockout still open ([#6](https://github.com/dblademasteh/elmsv2/issues/6)). Note: `lib/api.ts` already defines `verifyEmail` / `requestPasswordReset` / `resetPassword` client methods, but no backend endpoints exist — dead code until item ships | Security baseline | S–M |
+| 8 | ✅ **DONE** **Password reset + account lockout** — `POST /auth/reset-password` (no user enumeration; SHA-256-hashed single-use token, 60-min expiry; dev-only inline token since no email service) + `POST /auth/reset-password/confirm` (8-char minimum, clears lockout), login lockout (5 failures → 15-min 423 lock, cleared on success/reset), new `/forgot-password` page wired to the previously dead client methods. Email verification remains out of scope (no SMTP). | Security baseline | S–M |
 | 9 | ✅ **DONE** **Quiz enforcement** — `POST /courses/quizzes/{id}/start` attempt flow with server-side time-limit enforcement (+15s grace), server-side question randomization, ownership checks on create/delete | Flags exist but were lies before | S |
 | 10 | **Modules/sections** for course structure + categories/search ([#7](https://github.com/dblademasteh/elmsv2/issues/7)) | Catalog scalability | M |
 | 11 | **Migrations (alembic) + tests + CI** ([#8](https://github.com/dblademasteh/elmsv2/issues/8)) | Required before any production claim | M |

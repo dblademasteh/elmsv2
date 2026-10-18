@@ -188,11 +188,8 @@ export const authApi = {
   updateProfile: (data: { full_name?: string; avatar_url?: string; password?: string }) =>
     api.put<User>('/users/me', data),
 
-  verifyEmail: (token: string) =>
-    api.post<{ message: string }>('/auth/verify-email', { token }),
-
   requestPasswordReset: (email: string) =>
-    api.post<{ message: string }>('/auth/reset-password', { email }),
+    api.post<{ message: string; reset_token?: string }>('/auth/reset-password', { email }),
 
   resetPassword: (token: string, new_password: string) =>
     api.post<{ message: string }>('/auth/reset-password/confirm', { token, new_password }),

@@ -6,5 +6,6 @@ from .quiz import Quiz, QuizAttempt
 from .review import Review
 from .assignment import Assignment, AssignmentSubmission
 from .lesson_progress import LessonProgress
+from .password_reset import PasswordResetToken
 
-__all__ = ["User", "Course", "Enrollment", "Lesson", "Quiz", "QuizAttempt", "Review", "Assignment", "AssignmentSubmission", "LessonProgress"]
+__all__ = ["User", "Course", "Enrollment", "Lesson", "Quiz", "QuizAttempt", "Review", "Assignment", "AssignmentSubmission", "LessonProgress", "PasswordResetToken"]
