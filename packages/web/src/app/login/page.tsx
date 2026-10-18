@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useForm } from "react-hook-form"
@@ -29,7 +29,6 @@ const demoUsers = [
 export default function LoginPage() {
   const router = useRouter()
   const { login, isAuthenticated } = useAuthStore()
-  const emailRef = useRef<HTMLInputElement>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,10 +46,6 @@ export default function LoginPage() {
       router.replace("/dashboard")
     }
   }, [isAuthenticated, router])
-
-  useEffect(() => {
-    emailRef.current?.focus()
-  }, [])
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true)
@@ -156,10 +151,10 @@ export default function LoginPage() {
                 <div className="relative group">
                   <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-foreground" aria-hidden="true" />
                   <input
-                    ref={emailRef}
                     id="email"
                     type="email"
                     autoComplete="email"
+                    autoFocus
                     placeholder="name@example.com"
                     aria-invalid={!!errors.email}
                     aria-describedby={errors.email ? "email-error" : undefined}
