@@ -12,9 +12,9 @@ import pytest
 import sqlalchemy as sa
 
 TEST_DB = "lms_test"
-ASYNC_URL = f"postgresql+asyncpg://postgres:postgres@localhost:5432/{TEST_DB}"
-SYNC_URL = f"postgresql+psycopg2://postgres:postgres@localhost:5432/{TEST_DB}"
-ADMIN_URL = "postgresql+psycopg2://postgres:postgres@localhost:5432/postgres"
+ASYNC_URL = f"postgresql+asyncpg://postgres:postgres@172.20.0.2:5432/{TEST_DB}"
+SYNC_URL = f"postgresql+psycopg2://postgres:postgres@172.20.0.2:5432/{TEST_DB}"
+ADMIN_URL = "postgresql+psycopg2://postgres:postgres@172.20.0.2:5432/postgres"
 
 # Point the application at the test database before any app import.
 os.environ["DATABASE_URL"] = ASYNC_URL

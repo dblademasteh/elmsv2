@@ -66,6 +66,7 @@ interface Assignment {
   max_score: number
   max_file_size_mb: number
   allowed_file_types: string[]
+  rubric_json?: Array<Record<string, any>> | null
   is_required: boolean
   is_published: boolean
   created_at: string
@@ -144,6 +145,7 @@ export default function AssignmentManagementPage() {
       max_score: 100,
       max_file_size_mb: 10,
       allowed_file_types: ["pdf", "doc", "docx", "zip"],
+      rubric_json: [],
       is_required: true,
       is_published: false,
       created_at: new Date().toISOString(),
@@ -200,6 +202,7 @@ export default function AssignmentManagementPage() {
           max_score: editingAssignment.max_score,
           max_file_size_mb: editingAssignment.max_file_size_mb,
           allowed_file_types: editingAssignment.allowed_file_types,
+          rubric_json: editingAssignment.rubric_json as any,
           is_required: editingAssignment.is_required,
           is_published: editingAssignment.is_published,
         })
@@ -218,6 +221,7 @@ export default function AssignmentManagementPage() {
           max_score: editingAssignment.max_score,
           max_file_size_mb: editingAssignment.max_file_size_mb,
           allowed_file_types: editingAssignment.allowed_file_types,
+          rubric_json: editingAssignment.rubric_json as any,
           is_required: editingAssignment.is_required,
           is_published: editingAssignment.is_published,
         })
@@ -516,6 +520,66 @@ export default function AssignmentManagementPage() {
                   </div>
                 </div>
 
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Grading Rubric (optional)</label>
+                  <div className="space-y-2">
+                    {(editingAssignment.rubric_json || []).map((item: any, idx: number) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={item.criterion || ""}
+                          onChange={(e) => {
+                            const rubric = [...(editingAssignment.rubric_json || [])]
+                            rubric[idx] = { ...rubric[idx], criterion: e.target.value }
+                            setEditingAssignment({ ...editingAssignment, rubric_json: rubric })
+                          }}
+                          className="flex-1 px-2 py-1 text-sm border border-border rounded-md bg-background"
+                          placeholder="Criterion"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.points || 0}
+                          onChange={(e) => {
+                            const rubric = [...(editingAssignment.rubric_json || [])]
+                            rubric[idx] = { ...rubric[idx], points: parseFloat(e.target.value) || 0 }
+                            setEditingAssignment({ ...editingAssignment, rubric_json: rubric })
+                          }}
+                          className="w-20 px-2 py-1 text-sm border border-border rounded-md bg-background"
+                          placeholder="Pts"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            const rubric = [...(editingAssignment.rubric_json || [])]
+                            rubric.splice(idx, 1)
+                            setEditingAssignment({ ...editingAssignment, rubric_json: rubric })
+                          }}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const rubric = [...(editingAssignment.rubric_json || [])]
+                        rubric.push({ criterion: "", points: 0 })
+                        setEditingAssignment({ ...editingAssignment, rubric_json: rubric })
+                      }}
+                    >
+                      Add Criterion
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total: {(editingAssignment.rubric_json || []).reduce((s: number, i: any) => s + (Number(i.points)||0), 0)} pts
+                  </p>
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Allowed File Types</label>
                   <input

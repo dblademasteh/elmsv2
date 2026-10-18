@@ -76,25 +76,27 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
     <Link
       href={item.href}
       className={cn(
-        "group relative flex items-center gap-3.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200",
+        "group relative flex items-center gap-3.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 outline-none",
+        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
         isActive
           ? "bg-primary/10 text-primary shadow-inner shadow-primary/5"
           : "text-muted-foreground hover:bg-accent hover:text-foreground"
       )}
       aria-label={item.name}
+      aria-current={isActive ? "page" : undefined}
     >
       <item.icon
         className={cn(
-          "h-5 w-5 shrink-0 transition-colors",
-          isActive ? "text-primary" : "group-hover:text-foreground"
+          "h-5 w-5 shrink-0 transition-colors duration-200",
+          isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
         )}
         aria-hidden="true"
       />
-      <span>{item.name}</span>
+      <span className="truncate">{item.name}</span>
 
       {isActive && (
-        <div
-          className="absolute inset-y-0 left-0 w-0.5 rounded-r-full bg-primary"
+        <span
+          className="absolute inset-y-1.5 left-0 w-1 rounded-r-full bg-primary transition-all"
           aria-hidden="true"
         />
       )}
@@ -104,13 +106,16 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
 
 function NavGroup({ group, pathname }: { group: NavGroup; pathname: string }) {
   return (
-    <div className="mb-5 last:mb-0">
-      <p className="px-4 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/60 mb-1.5">
+    <div className="mb-6 last:mb-0">
+      <p className="px-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70 mb-2">
         {group.label}
       </p>
       <div className="space-y-1">
         {group.items.map((item) => {
-          const isActive = pathname === item.href
+          const isActive =
+            item.href === "/dashboard"
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(`${item.href}/`)
           return <NavLink key={item.name} item={item} isActive={isActive} />
         })}
       </div>
@@ -122,11 +127,11 @@ function SignOutButton({ onSignOut }: { onSignOut: () => void }) {
   return (
     <button
       onClick={onSignOut}
-      className="group relative flex w-full items-center gap-3.5 rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground"
+      className="group relative flex w-full items-center gap-3.5 rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 outline-none hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
       aria-label="Sign out"
     >
       <LogOut
-        className="h-5 w-5 shrink-0 group-hover:text-foreground"
+        className="h-5 w-5 shrink-0 transition-colors group-hover:text-destructive"
         aria-hidden="true"
       />
       <span>Sign Out</span>
@@ -161,12 +166,12 @@ export function Sidebar() {
 
   return (
     <aside
-      className="flex h-screen w-64 flex-col overflow-y-auto overflow-x-hidden bg-card border-r border-border"
+      className="flex h-screen w-64 flex-col overflow-y-auto overflow-x-hidden bg-card border-r border-border scrollbar-thin"
       aria-label="Main navigation"
     >
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2 px-6 border-b border-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+      <div className="flex h-16 shrink-0 items-center gap-2.5 px-6 border-b border-border">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
           <BookOpen className="h-5 w-5 text-primary" aria-hidden="true" />
         </div>
         <span className="text-xl font-bold tracking-tight text-foreground">
@@ -176,8 +181,8 @@ export function Sidebar() {
 
       {/* User Info */}
       {user && (
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
-          <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-sm font-medium text-foreground">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/30">
+          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-semibold text-primary ring-1 ring-primary/20">
             {user.full_name
               ?.split(" ")
               .map((n) => n[0])
@@ -195,15 +200,15 @@ export function Sidebar() {
               aria-label={`Status: ${user.role}`}
             />
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-foreground">
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-sm font-semibold text-foreground">
               {user.full_name}
             </span>
-            <span className="text-xs text-muted-foreground">{user.email}</span>
+            <span className="truncate text-xs text-muted-foreground">{user.email}</span>
           </div>
           <span
             className={cn(
-              "ml-auto rounded-full px-2.5 py-0.5 text-xs font-semibold",
+              "ml-auto shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize",
               getRoleColor(user.role)
             )}
           >
@@ -213,14 +218,14 @@ export function Sidebar() {
       )}
 
       {/* Main Navigation - Grouped */}
-      <nav className="flex-1 space-y-1 px-4 py-6" aria-label="Main navigation">
+      <nav className="flex-1 space-y-1 px-3 py-6" aria-label="Main navigation">
         {visibleGroups.map((group) => (
           <NavGroup key={group.label} group={group} pathname={pathname} />
         ))}
       </nav>
 
       {/* Bottom: Sign Out */}
-      <div className="border-t border-border px-4 py-6">
+      <div className="shrink-0 border-t border-border px-3 py-4">
         <SignOutButton onSignOut={logout} />
       </div>
     </aside>

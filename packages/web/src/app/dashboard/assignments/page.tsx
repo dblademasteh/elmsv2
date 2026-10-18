@@ -24,6 +24,7 @@ interface CourseAssignment {
   allowed_file_types: string[]
   max_file_size_mb: number
   instructions: string | null
+  rubric_json?: Array<Record<string, any>> | null
 }
 
 interface Submission {
@@ -48,6 +49,7 @@ interface CombinedAssignment {
   dueDate: string | null
   maxScore: number
   instructions: string | null
+  rubric_json?: Array<Record<string, any>> | null
   isPublished: boolean
   allowedFileTypes: string[]
   maxFileSizeMb: number
@@ -94,6 +96,7 @@ export default function StudentAssignmentsPage() {
               dueDate: a.due_date,
               maxScore: a.max_score,
               instructions: a.instructions,
+              rubric_json: a.rubric_json,
               isPublished: a.is_published,
               allowedFileTypes: a.allowed_file_types || [],
               maxFileSizeMb: a.max_file_size_mb,
@@ -268,6 +271,20 @@ export default function StudentAssignmentsPage() {
 
                   {a.instructions && (
                     <p className="text-sm text-muted-foreground">{a.instructions}</p>
+                  )}
+
+                  {a.rubric_json && a.rubric_json.length > 0 && (
+                    <div className="p-3 bg-muted rounded-md">
+                      <p className="text-sm font-medium mb-1">Grading Rubric</p>
+                      <div className="space-y-2">
+                        {a.rubric_json.map((item: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between text-sm">
+                            <span>{item.criterion || item.description || `Criterion ${idx+1}`}</span>
+                            <span className="text-muted-foreground">{item.points !== undefined ? `${item.points} pts` : ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
 
                   {a.submission && a.submission.feedback && (
