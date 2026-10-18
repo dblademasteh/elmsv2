@@ -53,6 +53,20 @@ class ReviewResponse(BaseModel):
         from_attributes = True
 
 
+class FeaturedReviewResponse(BaseModel):
+    """Public review for landing-page testimonials."""
+    id: uuid.UUID
+    user_full_name: str
+    user_avatar_url: Optional[str] = None
+    user_role: str
+    course_id: uuid.UUID
+    course_title: str
+    average_rating: float
+    title: Optional[str] = None
+    review: Optional[str] = None
+    created_at: datetime
+
+
 class CourseRatingSummary(BaseModel):
     """Aggregate rating summary for a course."""
     course_id: uuid.UUID

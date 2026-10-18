@@ -137,6 +137,40 @@ async def delete_review(db: AsyncSession, review_id: uuid.UUID) -> bool:
     return True
 
 
+async def get_featured_reviews(
+    db: AsyncSession,
+    limit: int = 6,
+) -> List[tuple]:
+    """Get approved, featured reviews across all published courses (public)."""
+    stmt = (
+        select(
+            Review.id,
+            User.full_name.label("user_full_name"),
+            User.avatar_url.label("user_avatar_url"),
+            User.role.label("user_role"),
+            Review.course_id,
+            Course.title.label("course_title"),
+            ((Review.rating_content + Review.rating_instructor + Review.rating_value) / 3.0)
+            .label("average_rating"),
+            Review.title,
+            Review.review,
+            Review.created_at,
+        )
+        .join(User, Review.user_id == User.id)
+        .join(Course, Review.course_id == Course.id)
+        .where(
+            Review.is_approved == True,
+            Review.is_featured == True,
+            Course.status == "published",
+            Course.is_private.is_(False),
+        )
+        .order_by(Review.created_at.desc())
+        .limit(min(max(limit, 1), 12))
+    )
+    result = await db.execute(stmt)
+    return result.fetchall()
+
+
 async def get_course_rating_summary(db: AsyncSession, course_id: uuid.UUID) -> dict:
     """Get aggregate rating summary for a course."""
     result = await db.execute(

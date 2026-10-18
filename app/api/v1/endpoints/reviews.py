@@ -1,11 +1,18 @@
 """Review endpoints"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from app.schemas.review import ReviewCreate, ReviewUpdate, ReviewResponse, CourseRatingSummary
+from app.schemas.review import (
+    ReviewCreate,
+    ReviewUpdate,
+    ReviewResponse,
+    CourseRatingSummary,
+    FeaturedReviewResponse,
+)
 from app.crud.review import (
     get_review_by_id,
     get_review_by_user_and_course,
     get_reviews_by_course,
+    get_featured_reviews,
     create_review,
     update_review,
     delete_review,
@@ -31,6 +38,27 @@ async def _get_current_user(credentials: HTTPAuthorizationCredentials, db):
             headers={"WWW-Authenticate": "Bearer"},
         )
     return await get_current_user_from_token(credentials, db)
+
+
+@router.get("/reviews/featured", response_model=List[FeaturedReviewResponse])
+async def list_featured_reviews(limit: int = 6, db: get_db = Depends()):
+    """Public: recent featured reviews across published courses (landing page)."""
+    rows = await get_featured_reviews(db, limit=limit)
+    return [
+        FeaturedReviewResponse(
+            id=r.id,
+            user_full_name=r.user_full_name,
+            user_avatar_url=r.user_avatar_url,
+            user_role=r.user_role,
+            course_id=r.course_id,
+            course_title=r.course_title,
+            average_rating=round(float(r.average_rating), 1),
+            title=r.title,
+            review=r.review,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
 
 
 @router.get("/{course_id}/reviews", response_model=List[ReviewResponse])

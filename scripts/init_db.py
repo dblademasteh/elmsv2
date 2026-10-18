@@ -231,6 +231,128 @@ async def init_db():
                     )
             logger.info(f"✅ Seeded {len(courses_all) * 3} sample lessons")
 
+        # Seed demo students with enrollments and featured reviews (idempotent)
+        demo_students = [
+            {"email": "sarah.chen@demo.lms.com", "full_name": "Sarah Chen"},
+            {"email": "marcus.johnson@demo.lms.com", "full_name": "Marcus Johnson"},
+            {"email": "priya.patel@demo.lms.com", "full_name": "Priya Patel"},
+            {"email": "alex.morgan@demo.lms.com", "full_name": "Alex Morgan"},
+            {"email": "lena.hoffman@demo.lms.com", "full_name": "Lena Hoffman"},
+            {"email": "diego.ramos@demo.lms.com", "full_name": "Diego Ramos"},
+        ]
+        demo_password_hash = get_password_hash("Student123!@#")
+        demo_user_ids = []
+        for s in demo_students:
+            row = await database.fetch_one(
+                "SELECT id FROM users WHERE email = :email", {"email": s["email"]}
+            )
+            if not row:
+                await database.execute(
+                    """
+                    INSERT INTO users (id, email, full_name, hashed_password, role, is_active)
+                    VALUES (:id, :email, :full_name, :hashed_password, 'student', TRUE)
+                    """,
+                    {
+                        "id": str(uuid.uuid4()),
+                        "email": s["email"],
+                        "full_name": s["full_name"],
+                        "hashed_password": demo_password_hash,
+                    },
+                )
+                row = await database.fetch_one(
+                    "SELECT id FROM users WHERE email = :email", {"email": s["email"]}
+                )
+            demo_user_ids.append(str(row["id"]))
+
+        demo_courses = await database.fetch_all(
+            "SELECT id, title FROM courses ORDER BY title"
+        )
+        if demo_courses:
+            # Enroll each demo student in one course (round-robin)
+            for i, uid in enumerate(demo_user_ids):
+                course = demo_courses[i % len(demo_courses)]
+                existing = await database.fetch_one(
+                    "SELECT id FROM enrollments WHERE user_id = :user_id AND course_id = :course_id",
+                    {"user_id": uid, "course_id": str(course["id"])},
+                )
+                if not existing:
+                    await database.execute(
+                        """
+                        INSERT INTO enrollments (id, user_id, course_id, progress_percent, status)
+                        VALUES (:id, :user_id, :course_id, :progress, 'active')
+                        """,
+                        {
+                            "id": str(uuid.uuid4()),
+                            "user_id": uid,
+                            "course_id": str(course["id"]),
+                            "progress": 35 + (i * 7) % 60,
+                        },
+                    )
+
+            demo_reviews = [
+                (0, 0, "The hands-on projects gave me real skills I use every day at work.", 5, 5, 4, True),
+                (1, 1, "I've taken courses from many platforms. This one stands out for its quality.", 5, 4, 5, True),
+                (2, 2, "The pacing and real-world examples made complex topics feel approachable.", 4, 5, 5, True),
+                (3, 1, "Clear explanations and practical exercises throughout.", 5, 5, 4, False),
+                (4, 0, "Great fundamentals course with modern tooling and friendly support.", 4, 4, 4, False),
+                (5, 2, "Exactly what I needed to level up my data skills.", 5, 4, 4, False),
+            ]
+            for student_idx, course_idx, text, rc, ri, rv, featured in demo_reviews:
+                if student_idx >= len(demo_user_ids) or course_idx >= len(demo_courses):
+                    continue
+                uid = demo_user_ids[student_idx]
+                cid = str(demo_courses[course_idx]["id"])
+                existing = await database.fetch_one(
+                    "SELECT id FROM reviews WHERE user_id = :user_id AND course_id = :course_id",
+                    {"user_id": uid, "course_id": cid},
+                )
+                if not existing:
+                    await database.execute(
+                        """
+                        INSERT INTO reviews (id, user_id, course_id, rating_content, rating_instructor,
+                                             rating_value, review, is_approved, is_featured)
+                        VALUES (:id, :user_id, :course_id, :rc, :ri, :rv, :review, TRUE, :featured)
+                        """,
+                        {
+                            "id": str(uuid.uuid4()),
+                            "user_id": uid,
+                            "course_id": cid,
+                            "rc": rc,
+                            "ri": ri,
+                            "rv": rv,
+                            "review": text,
+                            "featured": featured,
+                        },
+                    )
+
+            # Recalculate enrollment counts and rating stats from real rows
+            await database.execute(
+                """
+                UPDATE courses c SET enrollment_count = COALESCE(stats.cnt, 0)
+                FROM (
+                    SELECT course_id, COUNT(*) AS cnt FROM enrollments GROUP BY course_id
+                ) stats
+                WHERE c.id = stats.course_id
+                """
+            )
+            await database.execute(
+                """
+                UPDATE courses c SET
+                    rating_average = COALESCE(stats.avg_rating, 0),
+                    rating_count = COALESCE(stats.cnt, 0)
+                FROM (
+                    SELECT course_id,
+                           AVG((rating_content + rating_instructor + rating_value) / 3.0) AS avg_rating,
+                           COUNT(*) AS cnt
+                    FROM reviews
+                    WHERE is_approved = TRUE
+                    GROUP BY course_id
+                ) stats
+                WHERE c.id = stats.course_id
+                """
+            )
+            logger.info("✅ Seeded demo students, enrollments, and reviews")
+
         logger.info("✨ Database setup complete!")
 
     finally:

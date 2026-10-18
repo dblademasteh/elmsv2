@@ -715,6 +715,20 @@ export const reviewApi = {
       is_featured: boolean;
       created_at: string;
     } | null>(`/courses/${courseId}/reviews/my`),
+
+  listFeatured: (limit?: number) =>
+    api.get<Array<{
+      id: string;
+      user_full_name: string;
+      user_avatar_url: string | null;
+      user_role: string;
+      course_id: string;
+      course_title: string;
+      average_rating: number;
+      title: string | null;
+      review: string | null;
+      created_at: string;
+    }>>(`/courses/reviews/featured${limit ? `?limit=${limit}` : ''}`),
 };
 
 // File upload endpoints

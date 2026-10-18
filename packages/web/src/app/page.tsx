@@ -18,7 +18,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { courseApi, platformApi } from "@/lib/api"
+import { courseApi, platformApi, reviewApi } from "@/lib/api"
 import { useAuthStore } from "@/store/auth"
 import { LandingAppBar } from "@/components/layout/landing-appbar"
 import { LandingFooter } from "@/components/layout/landing-footer"
@@ -49,6 +49,19 @@ type Testimonial = {
   role: string
   content: string
   avatar: string
+  rating?: number
+}
+
+type FeaturedReview = {
+  id: string
+  user_full_name: string
+  user_avatar_url?: string | null
+  user_role: string
+  course_id: string
+  course_title: string
+  average_rating: number
+  title?: string | null
+  review?: string | null
 }
 
 const features: Feature[] = [
@@ -95,6 +108,15 @@ const testimonials: Testimonial[] = [
   },
 ]
 
+function initialsOf(fullName: string) {
+  return fullName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("")
+}
+
 function formatPrice(cents: number, currency: string) {
   if (!cents) return "Free"
   return new Intl.NumberFormat(undefined, {
@@ -115,6 +137,7 @@ export default function HomePage() {
     learners: number
     enrollments: number
   } | null>(null)
+  const [featuredReviews, setFeaturedReviews] = useState<FeaturedReview[]>([])
 
   useEffect(() => {
     let active = true
@@ -153,11 +176,36 @@ export default function HomePage() {
     return () => { active = false }
   }, [])
 
+  useEffect(() => {
+    let active = true
+
+    reviewApi.listFeatured(3).then((response) => {
+      if (!active) return
+      if (response.data) setFeaturedReviews(response.data)
+    }).catch(() => {
+      // Testimonials fall back to defaults on failure
+    })
+
+    return () => { active = false }
+  }, [])
+
   function handleSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const q = searchQuery.trim()
     router.push(q ? `/courses?q=${encodeURIComponent(q)}` : "/courses")
   }
+
+  const reviewTestimonials: Testimonial[] = featuredReviews
+    .filter((r) => r.review || r.title)
+    .slice(0, 3)
+    .map((r) => ({
+      name: r.user_full_name,
+      role: r.course_title,
+      content: r.review || r.title || "",
+      avatar: initialsOf(r.user_full_name),
+      rating: r.average_rating,
+    }))
+  const shownTestimonials = reviewTestimonials.length > 0 ? reviewTestimonials : testimonials
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -320,9 +368,27 @@ export default function HomePage() {
             </p>
           </div>
           <div className="mt-16 grid gap-8 sm:grid-cols-3">
-            {testimonials.map((testimonial) => (
+            {shownTestimonials.map((testimonial) => (
               <Card key={testimonial.name} className="border-border">
                 <CardContent className="pt-6">
+                  {typeof testimonial.rating === "number" && testimonial.rating > 0 && (
+                    <div
+                      className="mb-3 flex items-center gap-0.5"
+                      aria-label={`Rated ${testimonial.rating.toFixed(1)} out of 5`}
+                    >
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star
+                          key={n}
+                          className={`h-3.5 w-3.5 ${
+                            n <= Math.round(testimonial.rating!)
+                              ? "fill-current text-primary"
+                              : "text-muted-foreground/30"
+                          }`}
+                          aria-hidden="true"
+                        />
+                      ))}
+                    </div>
+                  )}
                   <p className="text-sm leading-6 text-muted-foreground">
                     "{testimonial.content}"
                   </p>

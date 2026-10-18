@@ -14,7 +14,7 @@
 | **Best for** | Small cohort courses, MVP/portfolio | K-12, higher ed, any scale | Higher ed wanting modern UX | MOOCs, corporate training | Lightweight institutional use |
 | **Stack** | FastAPI + Next.js 14 + Postgres | PHP + MySQL/Postgres | Ruby + React + PG/Redis/ES | Django Python microservices | PHP + MySQL |
 | **Maturity of *implemented* code** | Alpha (~55% frontend, ~60% backend of its own scope) | 20+ yrs | 10+ yrs | 12+ yrs | 15+ yrs |
-| **Deploy footprint** | 3 containers (db/redis/api) + Node | 1 web server + DB | 6–8 services | 20+ containers | 1 web + DB |
+| **Deploy footprint** | 3 containers (db/redis/api) + Node; also runs natively (Postgres + uvicorn + Node) | 1 web server + DB | 6–8 services | 20+ containers | 1 web + DB |
 
 **Headline finding:** eLMS has a *credible core loop* — author course → publish → enroll → lesson → quiz (auto-graded) → assignment (submit → grade) → review. That loop actually works end-to-end. Everything surrounding it (progress persistence, gradebook, file storage, communication, reporting, standards, mobile, i18n) is either absent or UI-stubbed.
 
@@ -40,22 +40,22 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | **Video hosting/streaming** | ❌ external `video_url` | ⚠️ plugin/external | ✅ Studio | ✅ | ⚠️ external |
 | **Quizzes & auto-grading** | ✅ MC/TF/short-answer | ✅ 15+ question types | ✅ | ✅ | ✅ |
 | **Question bank / pools** | ❌ (questions embedded in quiz JSONB) | ✅ | ✅ | ✅ | ✅ |
-| **Time-limit enforcement** | ⚠️ stored, never enforced | ✅ | ✅ | ✅ | ✅ |
-| **Question randomization** | ⚠️ flag stored, not applied | ✅ | ✅ | ✅ | ✅ |
+| **Time-limit enforcement** | ✅ server-side (+15s grace) | ✅ | ✅ | ✅ | ✅ |
+| **Question randomization** | ✅ server-side shuffle | ✅ | ✅ | ✅ | ✅ |
 | **Academic integrity (lockdown/proctoring)** | ❌ | ⚠️ plugins | ⚠️ plugins | ⚠️ | ❌ |
 | **Plagiarism detection** | ❌ | ✅ plugin (Turnitin etc.) | ✅ | ❌ | ⚠️ |
 | **Assignments (create/submit/grade)** | ✅ with rubric field + feedback | ✅ | ✅ | ✅ | ✅ |
-| **File upload / storage** | ❌ submission is a `file_url` string | ✅ | ✅ | ✅ | ✅ |
+| **File upload / storage** | ⚠️ disk-backed `POST /files/upload`, served at `/uploads`; no cloud storage/AV | ✅ | ✅ | ✅ | ✅ |
 | **Rubrics used in grading** | ⚠️ stored, never rendered | ✅ | ✅ | ✅ | ✅ |
 | **Late submission detection** | ❌ column exists, never computed | ✅ | ✅ | ✅ | ✅ |
 | **Gradebook / grade calc / export** | ❌ (per-item scores only) | ✅ | ✅ | ✅ | ✅ |
-| **Progress tracking & persistence** | ❌ crud exists, **no endpoint**; UI is client-local | ✅ | ✅ | ✅ | ✅ |
+| **Progress tracking & persistence** | ✅ `lesson_progress` table + endpoints, live in learn UI (manual completion) | ✅ | ✅ | ✅ | ✅ |
 | **Certificates** | ❌ columns only | ✅ plugin | ✅ | ✅ | ✅ |
 | **Discussions / forums** | ❌ (tables in SQL migration only) | ✅ | ✅ | ✅ | ✅ |
 | **Announcements** | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Messaging / notifications / email** | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Calendar / due dates view** | ❌ (`due_date` never surfaced) | ✅ | ✅ | ✅ | ✅ |
-| **Analytics & reporting** | ❌ fake dashboard numbers | ✅ logs, completion, report builder | ✅ Analytics 2 / Canvas Data | ✅ (strongest: Insights) | ✅ |
+| **Analytics & reporting** | ⚠️ real role-aware dashboard stats; analytics/report pages still stubs | ✅ logs, completion, report builder | ✅ Analytics 2 / Canvas Data | ✅ (strongest: Insights) | ✅ |
 | **Course reviews & ratings** | ✅ 3-criterion + distribution | ⚠️ plugin | ❌ | ❌ | ❌ |
 | **Self-enrollment** | ✅ (published, non-private) | ✅ | ✅ | ✅ | ✅ |
 | **Enrollment approval workflow** | ⚠️ fake UI page | ✅ | ✅ | ✅ | ✅ |
@@ -82,9 +82,9 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | Lessons/content | ~75% | Flat structure; no modules, no editor. |
 | Quizzes | ~75% | Works end-to-end but weakest vs. any competitor's question bank. |
 | Assignments & grading | ~80% | Strongest module; blocked by URL-only submissions. |
-| Enrollments & progress | ~50% | Progress is **non-functional** — the #1 LMS metric. |
+| Enrollments & progress | ~65% | Progress persisted end-to-end in the learn UI; approval workflow still a fake UI page. |
 | Reviews/ratings | ~85% | Genuine differentiator; Moodle needs a plugin, Canvas has none. |
-| Frontend overall | ~55% | 6 of 18 dashboard pages are hardcoded stubs. |
+| Frontend overall | ~55% | Stub routes remain (analytics, content, enrollments); 21 routes total. |
 | Infrastructure | ~45% | Redis unused, no alembic, no tests, no CI. |
 
 **Aggregate:** eLMS ≈ **15–20%** of the capability surface of Moodle/Chamilo, and well under 10% of Canvas/Open edX (which add scale, standards, and analytics).
@@ -115,7 +115,7 @@ Ordered by benchmark impact per unit of effort:
 | 5 | **Course authoring UI** (create/edit/publish) — API methods already in `lib/api.ts`, uncalled ([#3](https://github.com/dblademasteh/elmsv2/issues/3)) | Blocks instructors from actually using the product | M |
 | 6 | **Notifications + announcements** (even in-app only, no SMTP) ([#4](https://github.com/dblademasteh/elmsv2/issues/4)) | Table-less; communication is table stakes | M |
 | 7 | **Discussions** — tables already in `migrations/000001` ([#5](https://github.com/dblademasteh/elmsv2/issues/5)) | Schema is ahead of implementation | M |
-| 8 | ◐ **Half done** — `POST /auth/refresh` exchange (silent auto-refresh in the API client) + `POST /auth/logout` shipped; password reset and lockout still open ([#6](https://github.com/dblademasteh/elmsv2/issues/6)) | Security baseline | S–M |
+| 8 | ◐ **Half done** — real `POST /auth/refresh` exchange (silent auto-refresh in the API client) + `POST /auth/logout` shipped; password reset and lockout still open ([#6](https://github.com/dblademasteh/elmsv2/issues/6)). Note: `lib/api.ts` already defines `verifyEmail` / `requestPasswordReset` / `resetPassword` client methods, but no backend endpoints exist — dead code until item ships | Security baseline | S–M |
 | 9 | ✅ **DONE** **Quiz enforcement** — `POST /courses/quizzes/{id}/start` attempt flow with server-side time-limit enforcement (+15s grace), server-side question randomization, ownership checks on create/delete | Flags exist but were lies before | S |
 | 10 | **Modules/sections** for course structure + categories/search ([#7](https://github.com/dblademasteh/elmsv2/issues/7)) | Catalog scalability | M |
 | 11 | **Migrations (alembic) + tests + CI** ([#8](https://github.com/dblademasteh/elmsv2/issues/8)) | Required before any production claim | M |
@@ -125,7 +125,7 @@ Ordered by benchmark impact per unit of effort:
 
 **Deliberately out of scope for a small project:** proctoring, multi-tenancy, plugin marketplace, 20+ microservices parity with Open edX. Compete on simplicity, not breadth.
 
-> **Verification of the ✅/◐ items:** 21-test smoke suite run against a live `docker compose up` stack (all pass) covering refresh/logout, role-aware stats, persisted lesson progress incl. 100% auto-completion, multipart upload + served file + blocked extensions, and quiz start/time-limit/randomization/ownership flows. Frontend: `tsc --noEmit` clean and a clean `next build` (19/19 pages).
+> **Verification of the ✅/◐ items (re-checked in code, 2026-10-18):** progress endpoints + learn-page wiring (`app/api/v1/endpoints/lessons.py:235,260`, `learn/page.tsx:169,207`), upload endpoint + `/uploads` static serving (`app/main.py:71`), role-aware stats (`app/api/v1/endpoints/stats.py`), refresh/logout (`auth.py:66,100`), and quiz attempt flow with server-side time-limit enforcement + randomization (`quizzes.py:287,382,504`) are all present. Frontend: `tsc --noEmit` clean. Note: the previously referenced 21-test smoke suite is not committed to this repo — the only committed test is `test_assignments.py` (assignment-flow smoke script); CI/tests remain open ([#8](https://github.com/dblademasteh/elmsv2/issues/8)).
 
 ---
 
@@ -136,7 +136,7 @@ Ordered by benchmark impact per unit of effort:
 ---
 
 ### Sources
-- eLMS: direct code inventory of `app/` (8 endpoint modules, 10 models) and `packages/web/src/app/` (18 routes), 2026-10-18.
+- eLMS: direct code inventory of `app/` (10 endpoint modules, 8 models) and `packages/web/src/app/` (21 routes), 2026-10-18.
 - OpenEduCat, "Open Source LMS Comparison 2026" (Moodle vs Open edX vs Canvas vs ILIAS vs Sakai vs Chamilo).
 - Open edX blog, "Moodle versus the Open edX Platform: 9 Key Differences".
 - MooDIY, "Moodle vs Canvas vs Blackboard in 2026" (mobile, analytics, cost tables).
