@@ -51,6 +51,23 @@ services:
     networks:
       - lms-network
 
+  web:
+    build:
+      context: ./packages/web
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8081/api/v1
+    container_name: lms-web-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - api
+    networks:
+      - lms-network
+    restart: unless-stopped
+
 volumes:
   postgres_dev_data:
 
