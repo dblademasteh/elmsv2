@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, Bell, Search, User, Settings, LogOut, X } from "lucide-react"
+import { Menu, Bell, Search, User, Settings, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth"
+import { authApi, notificationApi, type AppNotification } from "@/lib/api"
 
 interface AppBarProps {
   onMenuClick?: () => void
@@ -19,46 +20,37 @@ const pageTitles: Record<string, string> = {
   "/dashboard/analytics": "Analytics",
   "/dashboard/content": "Content",
   "/dashboard/enrollments": "Enrollment Requests",
+  "/dashboard/notifications": "Notifications",
+  "/dashboard/assignments": "Assignments",
+  "/dashboard/gradebook": "Gradebook",
+  "/dashboard/students": "Students",
   "/dashboard/settings": "Settings",
   "/dashboard/help": "Help Center",
+  "/profile": "Profile",
 }
 
 function getPageTitle(path: string): string {
-  for (const [key, title] of Object.entries(pageTitles)) {
-    if (path.startsWith(key)) return title
-  }
+  const match = Object.entries(pageTitles)
+    .sort(([left], [right]) => right.length - left.length)
+    .find(([key]) => path === key || path.startsWith(`${key}/`))
+
+  if (match) return match[1]
   return "Dashboard"
 }
 
-// Local notification type — would be replaced with real API data
-type Notification = {
-  id: string
-  title: string
-  message: string
-  time: string
-  unread: boolean
+function timeAgo(iso: string | null): string {
+  if (!iso) return ""
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000))
+  if (seconds < 60) return "just now"
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
 }
-
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    title: "New enrollment",
-    message: "A student enrolled in your React course",
-    time: "2 hours ago",
-    unread: true,
-  },
-  {
-    id: "2",
-    title: "Content review",
-    message: "Course content is pending your approval",
-    time: "1 day ago",
-    unread: true,
-  },
-]
 
 function SearchBar() {
   const [query, setQuery] = useState("")
-  const [isSearching, setIsSearching] = useState(false)
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -68,7 +60,6 @@ function SearchBar() {
 
     const timer = setTimeout(() => {
       if (query.length >= 2) {
-        setIsSearching(false)
         router.push(`/courses?q=${encodeURIComponent(query)}`)
       }
     }, 300)
@@ -111,10 +102,19 @@ function SearchBar() {
 
 function NotificationButton() {
   const [open, setOpen] = useState(false)
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications)
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
-  const unreadCount = notifications.filter((n) => n.unread).length
+  useEffect(() => {
+    notificationApi.list().then((response) => {
+      if (response.data) {
+        setNotifications(response.data.notifications.slice(0, 5))
+        setUnreadCount(response.data.unread_count)
+      }
+    })
+  }, [])
 
   // Close dropdown on Escape or click outside
   useEffect(() => {
@@ -137,8 +137,31 @@ function NotificationButton() {
     }
   }, [open])
 
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
+  const markAllRead = async () => {
+    setNotifications((prev) =>
+      prev.map((notification) => ({
+        ...notification,
+        read_at: notification.read_at ?? new Date().toISOString(),
+      }))
+    )
+    setUnreadCount(0)
+    await notificationApi.markAllRead()
+  }
+
+  const openNotification = async (notification: AppNotification) => {
+    if (!notification.read_at) {
+      setNotifications((prev) =>
+        prev.map((item) =>
+          item.id === notification.id
+            ? { ...item, read_at: new Date().toISOString() }
+            : item
+        )
+      )
+      setUnreadCount((count) => Math.max(0, count - 1))
+      await notificationApi.markRead(notification.id)
+    }
+    setOpen(false)
+    router.push(notification.link_url || "/dashboard/notifications")
   }
 
   return (
@@ -192,30 +215,49 @@ function NotificationButton() {
             {notifications.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No notifications yet.</p>
             ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
+              notifications.map((notification) => (
+                <button
+                  type="button"
+                  key={notification.id}
                   className={cn(
-                    "flex items-start gap-3 p-3 text-sm transition-colors hover:bg-accent",
-                    n.unread && "bg-accent/30"
+                    "flex w-full items-start gap-3 p-3 text-left text-sm transition-colors hover:bg-accent",
+                    !notification.read_at && "bg-accent/30"
                   )}
                   role="menuitem"
+                  onClick={() => openNotification(notification)}
                 >
                   <Bell className="mt-0.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   <div className="flex-1">
-                    <p className="font-medium text-foreground">{n.title}</p>
-                    <p className="text-xs text-muted-foreground">{n.message}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{n.time}</p>
+                    <p className="font-medium text-foreground">{notification.title}</p>
+                    {notification.body && (
+                      <p className="text-xs text-muted-foreground">{notification.body}</p>
+                    )}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {timeAgo(notification.created_at)}
+                    </p>
                   </div>
-                  {n.unread && (
+                  {!notification.read_at && (
                     <span
                       className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary"
                       aria-label="Unread"
                     />
                   )}
-                </div>
+                </button>
               ))
             )}
+          </div>
+          <div className="border-t border-border p-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full"
+              onClick={() => {
+                setOpen(false)
+                router.push("/dashboard/notifications")
+              }}
+            >
+              View all notifications
+            </Button>
           </div>
         </div>
       )}
@@ -227,6 +269,7 @@ function UserMenu() {
   const { user, logout } = useAuthStore()
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   // Close on Escape or click outside
   useEffect(() => {
@@ -249,9 +292,12 @@ function UserMenu() {
     }
   }, [open])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await authApi.logout()
     logout()
     setOpen(false)
+    router.replace("/login")
+    router.refresh()
   }
 
   const getRoleColor = (role: string) => {
@@ -328,7 +374,7 @@ function UserMenu() {
               <button
                 onClick={() => {
                   setOpen(false)
-                  // Would navigate to profile page in real app
+                  router.push("/profile")
                 }}
                 className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-none"
                 role="menuitem"
@@ -339,7 +385,7 @@ function UserMenu() {
               <button
                 onClick={() => {
                   setOpen(false)
-                  // Would navigate to settings page
+                  router.push("/dashboard/settings")
                 }}
                 className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-none"
                 role="menuitem"
