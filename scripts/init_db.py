@@ -63,6 +63,10 @@ async def init_db():
                 "is_active": True
             })
             logger.info("✅ Admin: admin@lms.com / Admin123!@#")
+
+        if os.getenv("ENVIRONMENT") == "production":
+            logger.info("Production startup: skipping demo seed data")
+            return
         
         # Seed instructor
         instructor = await database.fetch_one(
