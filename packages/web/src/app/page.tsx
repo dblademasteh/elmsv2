@@ -121,7 +121,7 @@ function formatPrice(cents: number, currency: string) {
   if (!cents) return "Free"
   return new Intl.NumberFormat(undefined, {
     style: "currency",
-    currency: currency || "USD",
+    currency: currency || "PHP",
   }).format(cents / 100)
 }
 

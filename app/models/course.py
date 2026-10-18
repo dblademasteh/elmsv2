@@ -14,7 +14,7 @@ class Course(Base):
     description = Column(Text, nullable=True)
     short_description = Column(String(500), nullable=True)
     price_cents = Column(Integer, default=0)
-    currency = Column(String(3), default="USD")
+    currency = Column(String(3), default="PHP")
     level = Column(String(20), default="beginner")
     status = Column(String(20), default="draft")
     cover_image_url = Column(String(500), nullable=True)

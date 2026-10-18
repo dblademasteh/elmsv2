@@ -101,7 +101,7 @@ export default function DashboardAnalyticsPage() {
           label: "Enrollment value",
           value: new Intl.NumberFormat(undefined, {
             style: "currency",
-            currency: "USD",
+            currency: "PHP",
           }).format((stats.revenue_cents ?? 0) / 100),
         },
       )

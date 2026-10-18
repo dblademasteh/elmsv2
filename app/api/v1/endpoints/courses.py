@@ -147,7 +147,7 @@ async def create_new_course(
         description=course_in.description,
         short_description=course_in.short_description,
         price_cents=course_in.price_cents or 0,
-        currency=course_in.currency or "USD",
+        currency=course_in.currency or "PHP",
         level=course_in.level or "beginner",
         cover_image_url=course_in.cover_image_url,
         learning_objectives=course_in.learning_objectives,

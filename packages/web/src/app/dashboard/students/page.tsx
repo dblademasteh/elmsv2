@@ -39,10 +39,11 @@ const levelLabels: Record<string, string> = {
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return "—"
-  return new Date(dateStr).toLocaleDateString(undefined, {
+  return new Date(dateStr).toLocaleDateString("en-PH", {
     year: "numeric",
     month: "short",
     day: "numeric",
+    timeZone: "Asia/Manila",
   })
 }
 

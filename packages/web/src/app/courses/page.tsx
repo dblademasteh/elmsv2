@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { courseApi } from "@/lib/api"
+import { formatCurrency } from "@/lib/format"
 
 const LEVELS = ["All levels", "Beginner", "Intermediate", "Advanced"]
 const PRICES = ["All prices", "Free", "Under $50", "$50 - $100", "Over $100"]
@@ -228,7 +229,7 @@ function CoursesContent() {
                   <CardFooter className="p-4 border-t">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-primary-600">
-                        ${(course.price_cents / 100).toFixed(2)}
+                        {formatCurrency(course.price_cents, course.currency)}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {course.enrollment_count} students
@@ -269,7 +270,7 @@ function CoursesContent() {
                       </CardHeader>
                       <div className="flex items-center justify-between mb-4">
                         <span className="text-xs font-medium text-primary-600">
-                          ${(course.price_cents / 100).toFixed(2)}
+                          {formatCurrency(course.price_cents, course.currency)}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {course.enrollment_count} students

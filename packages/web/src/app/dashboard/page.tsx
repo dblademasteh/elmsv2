@@ -155,7 +155,7 @@ function CourseCardSkeleton() {
 function formatPrice(cents: number, currency: string) {
   return new Intl.NumberFormat(undefined, {
     style: "currency",
-    currency: currency || "USD",
+    currency: currency || "PHP",
   }).format(cents / 100)
 }
 
@@ -309,7 +309,7 @@ export default function DashboardPage() {
         },
         {
           title: "Enrolled Value",
-          value: new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(
+          value: new Intl.NumberFormat(undefined, { style: "currency", currency: "PHP" }).format(
             (statsData.revenue_cents ?? 0) / 100
           ),
           change: "across paid courses",

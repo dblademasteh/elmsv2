@@ -86,7 +86,7 @@ class CourseCreate(BaseModel):
     description: Optional[str] = None
     short_description: Optional[str] = None
     price_cents: int = 0
-    currency: str = "USD"
+    currency: str = "PHP"
     level: str = "beginner"
     cover_image_url: Optional[str] = None
     learning_objectives: Optional[str] = None

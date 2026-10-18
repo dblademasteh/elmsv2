@@ -89,7 +89,7 @@ async def create_course(
     description: str = None,
     short_description: str = None,
     price_cents: int = 0,
-    currency: str = "USD",
+    currency: str = "PHP",
     level: str = "beginner",
     cover_image_url: str = None,
     learning_objectives: str = None,

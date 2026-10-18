@@ -345,7 +345,7 @@ export default function DashboardCoursesPage() {
                         ? "Free"
                         : new Intl.NumberFormat(undefined, {
                             style: "currency",
-                            currency: course.currency || "USD",
+                            currency: course.currency || "PHP",
                           }).format(course.price_cents / 100)}
                     </td>
                     <td className="px-4 py-3">{course.enrollment_count}</td>
@@ -459,7 +459,7 @@ export default function DashboardCoursesPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="course-price">Price (USD)</Label>
+                  <Label htmlFor="course-price">Price (PHP)</Label>
                   <Input
                     id="course-price"
                     type="number"

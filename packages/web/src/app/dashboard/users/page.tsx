@@ -59,10 +59,11 @@ function UserAvatar({ name }: { name: string }) {
 }
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString(undefined, {
+  return new Date(dateStr).toLocaleDateString("en-PH", {
     year: "numeric",
     month: "short",
     day: "numeric",
+    timeZone: "Asia/Manila",
   })
 }
 

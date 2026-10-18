@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator"
 import { authApi, courseApi, enrollmentApi, reviewApi, lessonApi } from "@/lib/api"
 import { useAuthStore } from "@/store/auth"
+import { formatCurrency } from "@/lib/format"
 import { CourseDiscussions } from "@/components/discussions/course-discussions"
 
 export default function CoursePage() {
@@ -222,7 +223,7 @@ export default function CoursePage() {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Price</span>
                         <span className="font-medium text-foreground">
-                          ${(course.price_cents / 100).toFixed(2)}
+                          {formatCurrency(course.price_cents, course.currency)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
