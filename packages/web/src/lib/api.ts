@@ -755,6 +755,59 @@ export const platformApi = {
     }>('/dashboard/platform'),
 };
 
+// Gradebook (aggregated quiz + assignment scores per enrollment)
+export interface GradebookRow {
+  enrollment_id: string;
+  course_id: string;
+  course_title: string;
+  student_id: string;
+  student_name: string;
+  student_email: string;
+  progress_percent: number;
+  status: string;
+  graded_quiz_count: number;
+  quiz_avg_grade: number | null;
+  quiz_best_grade: number | null;
+  graded_assignment_count: number;
+  assignment_avg_percent: number | null;
+  overall_grade: number | null;
+}
+
+export const gradebookApi = {
+  list: (courseId?: string) =>
+    api.get<Array<GradebookRow>>(
+      `/dashboard/gradebook${courseId ? `?course_id=${encodeURIComponent(courseId)}` : ''}`
+    ),
+
+  exportCsv: async (courseId?: string): Promise<ApiResponse<boolean>> => {
+    try {
+      const token = useAuthStore.getState().token;
+      const response = await fetch(
+        `${API_URL}/dashboard/gradebook/export${courseId ? `?course_id=${encodeURIComponent(courseId)}` : ''}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: 'include',
+        }
+      );
+      if (!response.ok) return { error: 'Export failed' };
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = match?.[1] || 'gradebook.csv';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      return { data: true };
+    } catch {
+      return { error: 'Export failed' };
+    }
+  },
+};
+
 // Dashboard statistics
 export const dashboardApi = {
   getStats: () =>

@@ -14,6 +14,7 @@ import {
   GraduationCap,
   ShoppingCart,
   User,
+  ClipboardList,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth"
@@ -43,6 +44,7 @@ const navigationGroups: NavGroup[] = [
       { name: "Courses", href: "/dashboard/courses", icon: BookOpen, roles: ["admin", "instructor", "student"] },
       { name: "My Learning", href: "/dashboard/learning", icon: GraduationCap, roles: ["student"] },
       { name: "My Assignments", href: "/dashboard/assignments", icon: FileText, roles: ["student"] },
+      { name: "Gradebook", href: "/dashboard/gradebook", icon: ClipboardList, roles: ["admin", "instructor", "student"] },
     ],
   },
   {

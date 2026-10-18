@@ -48,7 +48,7 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | **File upload / storage** | ⚠️ disk-backed `POST /files/upload`, served at `/uploads`; no cloud storage/AV | ✅ | ✅ | ✅ | ✅ |
 | **Rubrics used in grading** | ⚠️ stored, never rendered | ✅ | ✅ | ✅ | ✅ |
 | **Late submission detection** | ❌ column exists, never computed | ✅ | ✅ | ✅ | ✅ |
-| **Gradebook / grade calc / export** | ❌ (per-item scores only) | ✅ | ✅ | ✅ | ✅ |
+| **Gradebook / grade calc / export** | ⚠️ per-enrollment quiz+assignment aggregation, instructor/student views, CSV export; no categories/weightings | ✅ | ✅ | ✅ | ✅ |
 | **Progress tracking & persistence** | ✅ `lesson_progress` table + endpoints, live in learn UI (manual completion) | ✅ | ✅ | ✅ | ✅ |
 | **Certificates** | ❌ columns only | ✅ plugin | ✅ | ✅ | ✅ |
 | **Discussions / forums** | ❌ (tables in SQL migration only) | ✅ | ✅ | ✅ | ✅ |
@@ -110,7 +110,7 @@ Ordered by benchmark impact per unit of effort:
 |---|---|---|---|
 | 1 | ✅ **DONE** **Progress persistence** — new `lesson_progress` table + `POST /courses/lessons/{id}/complete` + `GET /courses/{id}/progress`, wired into the learn page (checkmarks + live progress bar) | The #1 LMS metric; was dead code | XS |
 | 2 | ✅ **DONE** **File upload endpoint** — `POST /files/upload` (extension allowlist, size limit, chunked to disk), static `/uploads` serving, file picker in the assignment submit modal | Submissions as raw URLs disqualify against every competitor | S |
-| 3 | **Gradebook** — aggregate quiz + assignment scores per enrollment, student + instructor view, CSV export ([#1](https://github.com/dblademasteh/elmsv2/issues/1)) | Core expectation; score data already exists | M |
+| 3 | ✅ **DONE** **Gradebook** — `GET /dashboard/gradebook` (role-aware: instructor sees own courses' students, student sees own grades; overall = mean of quiz-avg grade and assignment-avg percent) + `GET /dashboard/gradebook/export` CSV, wired into a new `/dashboard/gradebook` page with course filter | Core expectation; score data already exists | M |
 | 4 | ◐ **Half done** — real `GET /dashboard/stats` aggregation (role-aware) wired into the main dashboard's stat cards; stub pages (analytics, content, enrollments) still to fix or remove ([#2](https://github.com/dblademasteh/elmsv2/issues/2)) | Fake UI is a credibility tax in any comparison | M |
 | 5 | **Course authoring UI** (create/edit/publish) — API methods already in `lib/api.ts`, uncalled ([#3](https://github.com/dblademasteh/elmsv2/issues/3)) | Blocks instructors from actually using the product | M |
 | 6 | **Notifications + announcements** (even in-app only, no SMTP) ([#4](https://github.com/dblademasteh/elmsv2/issues/4)) | Table-less; communication is table stakes | M |
