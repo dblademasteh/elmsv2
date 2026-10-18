@@ -47,6 +47,7 @@ class CourseListResponse(BaseModel):
     cover_image_url: Optional[str] = None
     is_featured: bool = False
     instructor_name: Optional[str] = None
+    status: str = "draft"
 
     class Config:
         from_attributes = True

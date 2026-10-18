@@ -32,7 +32,7 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | **Two-factor auth** | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Roles & permissions** | ⚠️ 3 fixed roles, inline checks | ✅ granular (site/course/activity) | ✅ roles + sub-accounts | ✅ complex roles | ✅ |
 | **Course CRUD** | ✅ API | ✅ | ✅ | ✅ | ✅ |
-| **Course authoring UI** | ❌ (API exists, no page) | ✅ | ✅ | ✅ (studio) | ✅ |
+| **Course authoring UI** | ✅ create/edit/publish/archive on `/dashboard/courses` | ✅ | ✅ | ✅ (studio) | ✅ |
 | **Course structure (modules/sections)** | ❌ flat lesson list | ✅ | ✅ | ✅ | ✅ |
 | **Prerequisites / conditional release** | ❌ (free-text field only) | ✅ | ✅ | ✅ | ✅ |
 | **Lessons w/ mixed content types** | ✅ video/text/quiz/assignment/download | ✅ | ✅ | ✅ | ✅ |
@@ -78,13 +78,13 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | Area | eLMS completion (of its own scope) | vs. competitors |
 |---|---|---|
 | Auth & users | ~65% | Basic. No reset/verify/SSO/2FA/lockout (columns dead). |
-| Courses & catalog | ~70% | API complete, **zero authoring UI**; no categories/search backend. |
+| Courses & catalog | ~85% | Authoring UI shipped (create/edit/publish/archive); no categories/search backend. |
 | Lessons/content | ~75% | Flat structure; no modules, no editor. |
 | Quizzes | ~75% | Works end-to-end but weakest vs. any competitor's question bank. |
 | Assignments & grading | ~80% | Strongest module; blocked by URL-only submissions. |
 | Enrollments & progress | ~65% | Progress persisted end-to-end in the learn UI; approval workflow still a fake UI page. |
 | Reviews/ratings | ~85% | Genuine differentiator; Moodle needs a plugin, Canvas has none. |
-| Frontend overall | ~65% | No stub routes remain; authoring UI still missing. |
+| Frontend overall | ~75% | No stub routes remain; authoring UI shipped. |
 | Infrastructure | ~45% | Redis unused, no alembic, no tests, no CI. |
 
 **Aggregate:** eLMS ≈ **15–20%** of the capability surface of Moodle/Chamilo, and well under 10% of Canvas/Open edX (which add scale, standards, and analytics).
@@ -112,7 +112,7 @@ Ordered by benchmark impact per unit of effort:
 | 2 | ✅ **DONE** **File upload endpoint** — `POST /files/upload` (extension allowlist, size limit, chunked to disk), static `/uploads` serving, file picker in the assignment submit modal | Submissions as raw URLs disqualify against every competitor | S |
 | 3 | ✅ **DONE** **Gradebook** — `GET /dashboard/gradebook` (role-aware: instructor sees own courses' students, student sees own grades; overall = mean of quiz-avg grade and assignment-avg percent) + `GET /dashboard/gradebook/export` CSV, wired into a new `/dashboard/gradebook` page with course filter | Core expectation; score data already exists | M |
 | 4 | ✅ **DONE** **Stub pages replaced with real data** — analytics page (role-aware stat cards from `GET /dashboard/stats` + real per-course enrollment chart), content page (real lesson inventory via lessons API, `?mine=true` added to course list for instructors), enrollments page (real enrollment list; fake "approve" UI removed — a real approval workflow is still future work, see matrix) | Fake UI is a credibility tax in any comparison | M |
-| 5 | **Course authoring UI** (create/edit/publish) — API methods already in `lib/api.ts`, uncalled ([#3](https://github.com/dblademasteh/elmsv2/issues/3)) | Blocks instructors from actually using the product | M |
+| 5 | ✅ **DONE** **Course authoring UI** — "My Courses" management page on `/dashboard/courses`: create dialog (title/short description/description/level/price, featured flag for admins), inline edit dialog, publish/unpublish toggle, archive with confirm; drafts visible to their instructor via `?mine=true` | Blocks instructors from actually using the product | M |
 | 6 | **Notifications + announcements** (even in-app only, no SMTP) ([#4](https://github.com/dblademasteh/elmsv2/issues/4)) | Table-less; communication is table stakes | M |
 | 7 | **Discussions** — tables already in `migrations/000001` ([#5](https://github.com/dblademasteh/elmsv2/issues/5)) | Schema is ahead of implementation | M |
 | 8 | ◐ **Half done** — real `POST /auth/refresh` exchange (silent auto-refresh in the API client) + `POST /auth/logout` shipped; password reset and lockout still open ([#6](https://github.com/dblademasteh/elmsv2/issues/6)). Note: `lib/api.ts` already defines `verifyEmail` / `requestPasswordReset` / `resetPassword` client methods, but no backend endpoints exist — dead code until item ships | Security baseline | S–M |

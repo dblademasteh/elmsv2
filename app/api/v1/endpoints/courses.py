@@ -69,6 +69,7 @@ async def list_courses(
             cover_image_url=c.cover_image_url,
             is_featured=c.is_featured,
             instructor_name=instructor_name,
+            status=c.status,
         ) for c, instructor_name in rows
     ]
 
@@ -150,6 +151,7 @@ async def create_new_course(
         description=new_course.description,
         level=new_course.level,
         rating_average=new_course.rating_average or 0,
+        status=new_course.status,
     )
 
 

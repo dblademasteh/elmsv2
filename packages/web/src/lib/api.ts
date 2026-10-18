@@ -238,6 +238,7 @@ export const courseApi = {
       cover_image_url?: string | null;
       is_featured?: boolean;
       instructor_name?: string | null;
+      status?: string;
     }>>(`/courses${query.size ? `?${query.toString()}` : ''}`);
   },
 
