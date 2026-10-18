@@ -34,9 +34,26 @@ async def list_courses(
     skip: int = 0,
     limit: int = 100,
     featured: Optional[bool] = None,
+    mine: bool = False,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer),
     db: get_db = Depends(),
 ):
-    rows = await get_courses(db, skip, limit, featured=featured)
+    """List courses. `mine=true` returns the current instructor's courses (drafts included)."""
+    instructor_id = None
+    if mine:
+        if not credentials:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        user = await get_current_user_from_token(credentials, db)
+        if user.role == "instructor":
+            instructor_id = user.id
+        elif user.role != "admin":
+            instructor_id = uuid.UUID(int=0)  # students: no courses
+
+    rows = await get_courses(db, skip, limit, featured=featured, instructor_id=instructor_id)
     return [
         CourseListResponse(
             id=c.id,

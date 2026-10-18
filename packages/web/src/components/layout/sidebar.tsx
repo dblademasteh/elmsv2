@@ -12,7 +12,6 @@ import {
   HelpCircle,
   LogOut,
   GraduationCap,
-  ShoppingCart,
   User,
   ClipboardList,
 } from "lucide-react"
@@ -55,7 +54,7 @@ const navigationGroups: NavGroup[] = [
       { name: "Quizzes", href: "/dashboard/courses", icon: HelpCircle, roles: ["admin", "instructor"] },
       { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, roles: ["admin", "instructor"] },
       { name: "Content", href: "/dashboard/content", icon: FileText, roles: ["admin", "instructor"] },
-      { name: "Enrollment Requests", href: "/dashboard/enrollments", icon: ShoppingCart, roles: ["admin"] },
+      { name: "Enrollments", href: "/dashboard/enrollments", icon: Users, roles: ["admin", "instructor"] },
     ],
   },
   {

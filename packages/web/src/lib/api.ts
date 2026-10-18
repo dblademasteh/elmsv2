@@ -218,11 +218,12 @@ export const userApi = {
 
 // Course endpoints
 export const courseApi = {
-  list: (params?: { skip?: number; limit?: number; featured?: boolean }) => {
+  list: (params?: { skip?: number; limit?: number; featured?: boolean; mine?: boolean }) => {
     const query = new URLSearchParams();
     if (params?.skip !== undefined) query.set('skip', String(params.skip));
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
     if (params?.featured !== undefined) query.set('featured', String(params.featured));
+    if (params?.mine !== undefined) query.set('mine', String(params.mine));
     return api.get<Array<{
       id: string;
       title: string;

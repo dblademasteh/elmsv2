@@ -22,17 +22,27 @@ async def get_course_by_id(db: AsyncSession, course_id: uuid.UUID) -> Optional[C
     return result.scalar_one_or_none()
 
 async def get_courses(
-    db: AsyncSession, skip: int = 0, limit: int = 100, featured: Optional[bool] = None
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 100,
+    featured: Optional[bool] = None,
+    instructor_id: Optional[uuid.UUID] = None,
 ) -> List[Tuple[Course, Optional[str]]]:
-    """List published public courses with instructor names.
+    """List courses with instructor names.
 
-    Returns (course, instructor_name) tuples ordered by popularity.
+    Returns (course, instructor_name) tuples. Published public courses by
+    default; pass instructor_id to list that instructor's courses regardless
+    of status (drafts included).
     """
     stmt = (
         select(Course, User.full_name)
         .outerjoin(User, Course.instructor_id == User.id)
-        .where(Course.status == "published", Course.is_private.is_(False))
+        .where(Course.is_private.is_(False))
     )
+    if instructor_id is not None:
+        stmt = stmt.where(Course.instructor_id == instructor_id)
+    else:
+        stmt = stmt.where(Course.status == "published")
     if featured is not None:
         stmt = stmt.where(Course.is_featured.is_(featured))
     stmt = stmt.order_by(desc(Course.enrollment_count), Course.title)

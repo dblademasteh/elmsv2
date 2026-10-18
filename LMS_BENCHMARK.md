@@ -55,10 +55,10 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | **Announcements** | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Messaging / notifications / email** | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Calendar / due dates view** | ❌ (`due_date` never surfaced) | ✅ | ✅ | ✅ | ✅ |
-| **Analytics & reporting** | ⚠️ real role-aware dashboard stats; analytics/report pages still stubs | ✅ logs, completion, report builder | ✅ Analytics 2 / Canvas Data | ✅ (strongest: Insights) | ✅ |
+| **Analytics & reporting** | ⚠️ real role-aware stats + per-course enrollment analytics; no logs/report builder | ✅ logs, completion, report builder | ✅ Analytics 2 / Canvas Data | ✅ (strongest: Insights) | ✅ |
 | **Course reviews & ratings** | ✅ 3-criterion + distribution | ⚠️ plugin | ❌ | ❌ | ❌ |
 | **Self-enrollment** | ✅ (published, non-private) | ✅ | ✅ | ✅ | ✅ |
-| **Enrollment approval workflow** | ⚠️ fake UI page | ✅ | ✅ | ✅ | ✅ |
+| **Enrollment approval workflow** | ❌ instant self-enrollment only (fake approval UI removed) | ✅ | ✅ | ✅ | ✅ |
 | **Cohorts / groups** | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Multi-tenancy / institutions** | ❌ | ⚠️ | ✅ sub-accounts | ✅ | ⚠️ |
 | **SCORM / xAPI / LTI** | ❌ | ✅ | ✅ | ✅ (LTI + XBlock) | ✅ |
@@ -84,7 +84,7 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | Assignments & grading | ~80% | Strongest module; blocked by URL-only submissions. |
 | Enrollments & progress | ~65% | Progress persisted end-to-end in the learn UI; approval workflow still a fake UI page. |
 | Reviews/ratings | ~85% | Genuine differentiator; Moodle needs a plugin, Canvas has none. |
-| Frontend overall | ~55% | Stub routes remain (analytics, content, enrollments); 21 routes total. |
+| Frontend overall | ~65% | No stub routes remain; authoring UI still missing. |
 | Infrastructure | ~45% | Redis unused, no alembic, no tests, no CI. |
 
 **Aggregate:** eLMS ≈ **15–20%** of the capability surface of Moodle/Chamilo, and well under 10% of Canvas/Open edX (which add scale, standards, and analytics).
@@ -111,7 +111,7 @@ Ordered by benchmark impact per unit of effort:
 | 1 | ✅ **DONE** **Progress persistence** — new `lesson_progress` table + `POST /courses/lessons/{id}/complete` + `GET /courses/{id}/progress`, wired into the learn page (checkmarks + live progress bar) | The #1 LMS metric; was dead code | XS |
 | 2 | ✅ **DONE** **File upload endpoint** — `POST /files/upload` (extension allowlist, size limit, chunked to disk), static `/uploads` serving, file picker in the assignment submit modal | Submissions as raw URLs disqualify against every competitor | S |
 | 3 | ✅ **DONE** **Gradebook** — `GET /dashboard/gradebook` (role-aware: instructor sees own courses' students, student sees own grades; overall = mean of quiz-avg grade and assignment-avg percent) + `GET /dashboard/gradebook/export` CSV, wired into a new `/dashboard/gradebook` page with course filter | Core expectation; score data already exists | M |
-| 4 | ◐ **Half done** — real `GET /dashboard/stats` aggregation (role-aware) wired into the main dashboard's stat cards; stub pages (analytics, content, enrollments) still to fix or remove ([#2](https://github.com/dblademasteh/elmsv2/issues/2)) | Fake UI is a credibility tax in any comparison | M |
+| 4 | ✅ **DONE** **Stub pages replaced with real data** — analytics page (role-aware stat cards from `GET /dashboard/stats` + real per-course enrollment chart), content page (real lesson inventory via lessons API, `?mine=true` added to course list for instructors), enrollments page (real enrollment list; fake "approve" UI removed — a real approval workflow is still future work, see matrix) | Fake UI is a credibility tax in any comparison | M |
 | 5 | **Course authoring UI** (create/edit/publish) — API methods already in `lib/api.ts`, uncalled ([#3](https://github.com/dblademasteh/elmsv2/issues/3)) | Blocks instructors from actually using the product | M |
 | 6 | **Notifications + announcements** (even in-app only, no SMTP) ([#4](https://github.com/dblademasteh/elmsv2/issues/4)) | Table-less; communication is table stakes | M |
 | 7 | **Discussions** — tables already in `migrations/000001` ([#5](https://github.com/dblademasteh/elmsv2/issues/5)) | Schema is ahead of implementation | M |
