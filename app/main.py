@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.api.v1.api import api_router
+from urllib.parse import urlsplit, urlunsplit
 from app.api.v1.endpoints.files import get_upload_root
 from app.db import database
 from app.core.config import settings
@@ -71,6 +72,18 @@ async def root():
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
+
+
+# Rewrite insecure http:// redirects to https:// (traefik terminates TLS)
+@app.middleware("http")
+async def https_redirect_middleware(request: Request, call_next):
+    response = await call_next(request)
+    location = response.headers.get("location")
+    if location and location.startswith("http://"):
+        parts = urlsplit(location)
+        response.headers["location"] = urlunsplit(parts._replace(scheme="https"))
+    return response
+
 
 # Serve uploaded files (assignment submissions, etc.)
 app.mount("/uploads", StaticFiles(directory=get_upload_root()), name="uploads")
