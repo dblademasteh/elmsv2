@@ -25,15 +25,12 @@ function CoursesContent() {
   const [courses, setCourses] = useState<any[]>([])
   const [level, setLevel] = useState("All levels")
   const [price, setPrice] = useState("All prices")
+  const [sort, setSort] = useState("popular")
   const [search, setSearch] = useState("")
   const [view, setView] = useState<"grid" | "list">("grid")
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const searchParams = useSearchParams()
-
-  useEffect(() => {
-    loadCourses()
-  }, [])
 
   // Sync URL search params to local state
   useEffect(() => {
@@ -46,57 +43,38 @@ function CoursesContent() {
     }
   }, [searchParams])
 
-  async function loadCourses() {
-    setLoading(true)
-    try {
-      const response = await courseApi.list()
-      if (response.data) {
-        setCourses(response.data)
+  // Server-side search, filters, and sorting (debounced)
+  useEffect(() => {
+    let active = true
+    const timer = setTimeout(async () => {
+      setLoading(true)
+      const params: Parameters<typeof courseApi.list>[0] = { limit: 50, sort: sort as "popular" }
+      if (search.trim()) params.search = search.trim()
+      if (level !== "All levels") params.level = level
+      if (price === "Free") params.max_price_cents = 0
+      else if (price === "Under $50") params.max_price_cents = 4999
+      else if (price === "$50 - $100") {
+        params.min_price_cents = 5000
+        params.max_price_cents = 10000
+      } else if (price === "Over $100") params.min_price_cents = 10001
+
+      try {
+        const response = await courseApi.list(params)
+        if (active) setCourses(response.data ?? [])
+      } catch {
+        if (active) setCourses([])
+      } finally {
+        if (active) setLoading(false)
       }
-    } catch {
-      setCourses([])
-    } finally {
-      setLoading(false)
+    }, 300)
+
+    return () => {
+      active = false
+      clearTimeout(timer)
     }
-  }
+  }, [search, level, price, sort])
 
-  const filteredCourses = courses.filter((c) => {
-    const matchesSearch =
-      c.title?.toLowerCase().includes(search.toLowerCase()) ||
-      c.description?.toLowerCase().includes(search.toLowerCase())
-    const matchesLevel = level === "All levels" || c.level === level
-    const matchesPrice =
-      price === "All prices" ||
-      (price === "Free" && c.price_cents === 0) ||
-      (price === "Under $50" && c.price_cents > 0 && c.price_cents < 5000) ||
-      (price === "$50 - $100" && c.price_cents >= 5000 && c.price_cents <= 10000) ||
-      (price === "Over $100" && c.price_cents > 10000)
-    return matchesSearch && matchesLevel && matchesPrice
-  })
-
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-      </div>
-    )
-  }
-
-  if (filteredCourses.length === 0) {
-    return (
-      <div className="min-h-screen bg-background text-foreground px-4 py-20">
-        <div className="max-w-md mx-auto text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/50 mx-auto mb-4">
-            <Search className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-medium text-foreground">No courses found</h3>
-          <p className="text-muted-foreground">
-            Try adjusting your search or filters.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const empty = !loading && courses.length === 0
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -174,11 +152,51 @@ function CoursesContent() {
                 ))}
               </select>
             </div>
+            <div className="flex items-center gap-3">
+              <Label htmlFor="sort" className="text-xs font-medium text-muted-foreground">
+                Sort by
+              </Label>
+              <select
+                id="sort"
+                value={sort}
+                onChange={(e) => setSort(e.target.value)}
+                className="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="popular">Most popular</option>
+                <option value="rating">Highest rated</option>
+                <option value="newest">Newest</option>
+                <option value="price_asc">Price: low to high</option>
+                <option value="price_desc">Price: high to low</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2 sm:hidden w-full">
+              <input
+                type="search"
+                placeholder="Search courses..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
           </div>
 
-          {view === "grid" ? (
+          {loading ? (
+            <div className="flex h-64 items-center justify-center">
+              <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+            </div>
+          ) : empty ? (
+            <div className="max-w-md mx-auto text-center py-20">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/50 mx-auto mb-4">
+                <Search className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium text-foreground">No courses found</h3>
+              <p className="text-muted-foreground">
+                Try adjusting your search or filters.
+              </p>
+            </div>
+          ) : view === "grid" ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {filteredCourses.map((course) => (
+              {courses.map((course) => (
                 <Card
                   key={course.id}
                   className="overflow-hidden hover:shadow-xl transition-shadow group"
@@ -193,8 +211,12 @@ function CoursesContent() {
                   <CardHeader className="p-5 pt-4">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
                       <span>{course.level}</span>
-                      <span className="mx-1 h-1 w-1 rounded-full bg-muted-foreground/20" />
-                      <span>{course.estimated_minutes} min</span>
+                      {course.estimated_minutes ? (
+                        <>
+                          <span className="mx-1 h-1 w-1 rounded-full bg-muted-foreground/20" />
+                          <span>{course.estimated_minutes} min</span>
+                        </>
+                      ) : null}
                     </div>
                     <CardTitle className="text-base leading-snug group-hover:text-primary-600 transition-colors">
                       {course.title}
@@ -224,7 +246,7 @@ function CoursesContent() {
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredCourses.map((course) => (
+              {courses.map((course) => (
                 <Card key={course.id} className="overflow-hidden hover:shadow-md transition-shadow">
                   <div className="grid grid-cols-12 gap-0 p-0">
                     <div

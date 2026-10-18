@@ -8,6 +8,8 @@ from datetime import datetime
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from sqlalchemy import text
+
 from app.db.database import database, engine, Base
 from app.models.user import User
 from app.models.course import Course
@@ -25,7 +27,15 @@ async def init_db():
     # Create tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
+    # Lightweight column migrations (create_all does not alter existing tables)
+    alter_statements = [
+        "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS section_title VARCHAR(255)",
+    ]
+    async with engine.begin() as conn:
+        for statement in alter_statements:
+            await conn.execute(text(statement))
+
     logger.info("✅ Tables created successfully!")
     
     # Connect to database
@@ -297,7 +307,7 @@ async def init_db():
                 (4, 0, "Great fundamentals course with modern tooling and friendly support.", 4, 4, 4, False),
                 (5, 2, "Exactly what I needed to level up my data skills.", 5, 4, 4, False),
             ]
-            for student_idx, course_idx, text, rc, ri, rv, featured in demo_reviews:
+            for student_idx, course_idx, review_text, rc, ri, rv, featured in demo_reviews:
                 if student_idx >= len(demo_user_ids) or course_idx >= len(demo_courses):
                     continue
                 uid = demo_user_ids[student_idx]
@@ -320,7 +330,7 @@ async def init_db():
                             "rc": rc,
                             "ri": ri,
                             "rv": rv,
-                            "review": text,
+                            "review": review_text,
                             "featured": featured,
                         },
                     )

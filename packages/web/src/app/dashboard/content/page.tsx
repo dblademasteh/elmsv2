@@ -14,6 +14,7 @@ type ContentRow = {
   is_published: boolean
   position: number
   estimated_minutes: number
+  section_title: string | null
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -58,6 +59,7 @@ export default function DashboardContentPage() {
               is_published: lesson.is_published,
               position: lesson.position,
               estimated_minutes: lesson.estimated_minutes,
+              section_title: lesson.section_title ?? null,
             })
           }
         })
@@ -133,6 +135,7 @@ export default function DashboardContentPage() {
                 <tr className="border-b bg-muted/60 text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Lesson</th>
                   <th className="px-4 py-3 font-medium">Course</th>
+                  <th className="px-4 py-3 font-medium">Section</th>
                   <th className="px-4 py-3 font-medium">Type</th>
                   <th className="px-4 py-3 font-medium">Length</th>
                   <th className="px-4 py-3 font-medium">Status</th>
@@ -143,6 +146,30 @@ export default function DashboardContentPage() {
                   <tr key={r.lesson_id} className="border-b last:border-0">
                     <td className="px-4 py-3 font-medium text-foreground">{r.title}</td>
                     <td className="px-4 py-3 text-muted-foreground">{r.course_title}</td>
+                    <td className="px-4 py-3">
+                      <input
+                        defaultValue={r.section_title ?? ""}
+                        placeholder="—"
+                        aria-label={`Section for ${r.title}`}
+                        onBlur={async (e) => {
+                          const value = e.target.value.trim()
+                          if (value === (r.section_title ?? "")) return
+                          const response = await lessonApi.update(r.lesson_id, {
+                            section_title: value || null,
+                          })
+                          if (!response.error) {
+                            setRows((prev) =>
+                              prev.map((row) =>
+                                row.lesson_id === r.lesson_id
+                                  ? { ...row, section_title: value || null }
+                                  : row
+                              )
+                            )
+                          }
+                        }}
+                        className="w-36 rounded-md border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </td>
                     <td className="px-4 py-3">{TYPE_LABELS[r.content_type] ?? r.content_type}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {r.estimated_minutes > 0 ? `${r.estimated_minutes} min` : "—"}

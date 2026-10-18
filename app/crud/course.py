@@ -1,11 +1,19 @@
 """Course CRUD operations"""
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, asc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.course import Course
 from app.models.user import User
 from typing import List, Optional, Tuple
 import uuid
 from datetime import datetime
+
+SORT_OPTIONS = {
+    "popular": [desc(Course.enrollment_count), Course.title],
+    "rating": [desc(Course.rating_average), desc(Course.rating_count)],
+    "price_asc": [asc(Course.price_cents), Course.title],
+    "price_desc": [desc(Course.price_cents), Course.title],
+    "newest": [desc(Course.created_at)],
+}
 
 async def get_course_by_slug(db: AsyncSession, slug: str) -> Optional[Course]:
     result = await db.execute(select(Course).where(Course.slug == slug))
@@ -27,12 +35,18 @@ async def get_courses(
     limit: int = 100,
     featured: Optional[bool] = None,
     instructor_id: Optional[uuid.UUID] = None,
+    search: Optional[str] = None,
+    level: Optional[str] = None,
+    min_price_cents: Optional[int] = None,
+    max_price_cents: Optional[int] = None,
+    sort: str = "popular",
 ) -> List[Tuple[Course, Optional[str]]]:
     """List courses with instructor names.
 
     Returns (course, instructor_name) tuples. Published public courses by
     default; pass instructor_id to list that instructor's courses regardless
-    of status (drafts included).
+    of status (drafts included). Supports search, level, price-range filters
+    and sorting.
     """
     stmt = (
         select(Course, User.full_name)
@@ -43,9 +57,27 @@ async def get_courses(
         stmt = stmt.where(Course.instructor_id == instructor_id)
     else:
         stmt = stmt.where(Course.status == "published")
+
     if featured is not None:
         stmt = stmt.where(Course.is_featured.is_(featured))
-    stmt = stmt.order_by(desc(Course.enrollment_count), Course.title)
+    if search:
+        pattern = f"%{search}%"
+        stmt = stmt.where(
+            or_(
+                Course.title.ilike(pattern),
+                Course.short_description.ilike(pattern),
+                Course.description.ilike(pattern),
+            )
+        )
+    if level:
+        stmt = stmt.where(Course.level == level)
+    if min_price_cents is not None:
+        stmt = stmt.where(Course.price_cents >= min_price_cents)
+    if max_price_cents is not None:
+        stmt = stmt.where(Course.price_cents <= max_price_cents)
+
+    order_by = SORT_OPTIONS.get(sort, SORT_OPTIONS["popular"])
+    stmt = stmt.order_by(*order_by)
     stmt = stmt.offset(max(skip, 0)).limit(min(max(limit, 1), 100))
     result = await db.execute(stmt)
     return [(row[0], row[1]) for row in result.all()]

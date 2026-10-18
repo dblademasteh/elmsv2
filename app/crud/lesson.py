@@ -34,6 +34,7 @@ async def create_lesson(
     duration_seconds: int = None,
     content_json: str = None,
     estimated_minutes: int = 5,
+    section_title: str = None,
 ) -> Lesson:
     """Create a new lesson for a course."""
     db_lesson = Lesson(
@@ -47,6 +48,7 @@ async def create_lesson(
         duration_seconds=duration_seconds,
         content_json=content_json,
         estimated_minutes=estimated_minutes,
+        section_title=section_title,
         is_published=False,
     )
     db.add(db_lesson)
@@ -68,6 +70,7 @@ async def update_lesson(
     content_json: str = None,
     estimated_minutes: int = None,
     is_published: bool = None,
+    section_title: str = None,
 ) -> Optional[Lesson]:
     """Update an existing lesson."""
     lesson = await get_lesson_by_id(db, lesson_id)
@@ -96,6 +99,8 @@ async def update_lesson(
         lesson.is_published = is_published
         if is_published:
             lesson.published_at = func.now()
+    if section_title is not None:
+        lesson.section_title = section_title
 
     await db.commit()
     await db.refresh(lesson)

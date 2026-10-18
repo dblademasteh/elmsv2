@@ -33,7 +33,7 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | **Roles & permissions** | ⚠️ 3 fixed roles, inline checks | ✅ granular (site/course/activity) | ✅ roles + sub-accounts | ✅ complex roles | ✅ |
 | **Course CRUD** | ✅ API | ✅ | ✅ | ✅ | ✅ |
 | **Course authoring UI** | ✅ create/edit/publish/archive on `/dashboard/courses` | ✅ | ✅ | ✅ (studio) | ✅ |
-| **Course structure (modules/sections)** | ❌ flat lesson list | ✅ | ✅ | ✅ | ✅ |
+| **Course structure (modules/sections)** | ⚠️ lesson `section_title` sections; no module entity | ✅ | ✅ | ✅ | ✅ |
 | **Prerequisites / conditional release** | ❌ (free-text field only) | ✅ | ✅ | ✅ | ✅ |
 | **Lessons w/ mixed content types** | ✅ video/text/quiz/assignment/download | ✅ | ✅ | ✅ | ✅ |
 | **Rich content editor** | ❌ `content_json` unused | ✅ Atto/TinyMCE | ✅ RCE | ✅ | ✅ |
@@ -78,7 +78,7 @@ Legend: ✅ full · ⚠️ partial/stub · ❌ absent
 | Area | eLMS completion (of its own scope) | vs. competitors |
 |---|---|---|
 | Auth & users | ~80% | Reset + lockout shipped; no verify/SSO/2FA (verification needs email infra). |
-| Courses & catalog | ~85% | Authoring UI shipped (create/edit/publish/archive); no categories/search backend. |
+| Courses & catalog | ~90% | Authoring + server-side search/filters/sort shipped; no categories/tags. |
 | Lessons/content | ~75% | Flat structure; no modules, no editor. |
 | Quizzes | ~75% | Works end-to-end but weakest vs. any competitor's question bank. |
 | Assignments & grading | ~80% | Strongest module; blocked by URL-only submissions. |
@@ -117,7 +117,7 @@ Ordered by benchmark impact per unit of effort:
 | 7 | ✅ **DONE** **Discussions** — course forums on the course page: threads + replies, enrollment-gated access (enrolled students + course instructor + admin), instructor moderation (delete posts/threads), reply notifications to thread authors, pinned/locked flags | Schema was ahead of implementation | M |
 | 8 | ✅ **DONE** **Password reset + account lockout** — `POST /auth/reset-password` (no user enumeration; SHA-256-hashed single-use token, 60-min expiry; dev-only inline token since no email service) + `POST /auth/reset-password/confirm` (8-char minimum, clears lockout), login lockout (5 failures → 15-min 423 lock, cleared on success/reset), new `/forgot-password` page wired to the previously dead client methods. Email verification remains out of scope (no SMTP). | Security baseline | S–M |
 | 9 | ✅ **DONE** **Quiz enforcement** — `POST /courses/quizzes/{id}/start` attempt flow with server-side time-limit enforcement (+15s grace), server-side question randomization, ownership checks on create/delete | Flags exist but were lies before | S |
-| 10 | **Modules/sections** for course structure + categories/search ([#7](https://github.com/dblademasteh/elmsv2/issues/7)) | Catalog scalability | M |
+| 10 | ✅ **DONE** **Course structure + search** — server-side `search` (title/description ILIKE), `level`, price-range (`min_price_cents`/`max_price_cents`), and `sort` (popular/rating/newest/price) on `GET /courses`, wired into the catalog with a sort dropdown and debounced server-side filtering; lesson `section_title` for course sections (idempotent ALTER migration), real syllabus on the course page (replaced hardcoded fake), section editing in the Content page. Full module entities (module table + drag/drop) remain future work. | Catalog scalability | M |
 | 11 | **Migrations (alembic) + tests + CI** ([#8](https://github.com/dblademasteh/elmsv2/issues/8)) | Required before any production claim | M |
 | 12 | **LTI 1.3 + SCORM import** ([#9](https://github.com/dblademasteh/elmsv2/issues/9)) | Only path to interop parity | L |
 | 13 | **i18n (next-intl) + accessibility audit** ([#10](https://github.com/dblademasteh/elmsv2/issues/10)) | Parity with all four competitors | L |

@@ -35,10 +35,15 @@ async def list_courses(
     limit: int = 100,
     featured: Optional[bool] = None,
     mine: bool = False,
+    search: Optional[str] = None,
+    level: Optional[str] = None,
+    min_price_cents: Optional[int] = None,
+    max_price_cents: Optional[int] = None,
+    sort: str = "popular",
     credentials: HTTPAuthorizationCredentials = Depends(bearer),
     db: get_db = Depends(),
 ):
-    """List courses. `mine=true` returns the current instructor's courses (drafts included)."""
+    """List courses with search, level/price filters, and sorting."""
     instructor_id = None
     if mine:
         if not credentials:
@@ -53,7 +58,18 @@ async def list_courses(
         elif user.role != "admin":
             instructor_id = uuid.UUID(int=0)  # students: no courses
 
-    rows = await get_courses(db, skip, limit, featured=featured, instructor_id=instructor_id)
+    rows = await get_courses(
+        db,
+        skip,
+        limit,
+        featured=featured,
+        instructor_id=instructor_id,
+        search=search,
+        level=level,
+        min_price_cents=min_price_cents,
+        max_price_cents=max_price_cents,
+        sort=sort,
+    )
     return [
         CourseListResponse(
             id=c.id,

@@ -7,7 +7,7 @@ import { ArrowRight, Play, Star, Clock, Users, BookOpen, Loader2, LogIn } from "
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { authApi, courseApi, enrollmentApi, reviewApi } from "@/lib/api"
+import { authApi, courseApi, enrollmentApi, reviewApi, lessonApi } from "@/lib/api"
 import { useAuthStore } from "@/store/auth"
 import { CourseDiscussions } from "@/components/discussions/course-discussions"
 
@@ -30,6 +30,8 @@ export default function CoursePage() {
     review: "",
   })
   const [submittingReview, setSubmittingReview] = useState(false)
+  const [syllabus, setSyllabus] = useState<Array<{ id: string; title: string; section_title: string | null }>>([])
+  const [loadingSyllabus, setLoadingSyllabus] = useState(true)
   const { user, token, isAuthenticated } = useAuthStore()
 
   const objectives = typeof course?.learning_objectives === "string"
@@ -54,6 +56,21 @@ export default function CoursePage() {
         if (summaryResp.data) setRatingSummary(summaryResp.data)
       } catch {
         // Rating summary is optional
+      }
+
+      try {
+        const lessonsResp = await lessonApi.listByCourse(courseId)
+        setSyllabus(
+          (lessonsResp.data ?? []).map((l) => ({
+            id: l.id,
+            title: l.title,
+            section_title: l.section_title ?? null,
+          }))
+        )
+      } catch {
+        setSyllabus([])
+      } finally {
+        setLoadingSyllabus(false)
       }
     } catch {
       setCourse(null)
@@ -259,19 +276,34 @@ export default function CoursePage() {
                   <CardTitle className="text-sm font-semibold">Syllabus</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="divide-y divide-border">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="p-4 flex items-center justify-between group hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="h-2 w-2 rounded-full bg-muted-foreground/20" />
-                          <span className="text-sm text-foreground">
-                            Lesson {i}: Getting started
-                          </span>
+                  {loadingSyllabus ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
+                    </div>
+                  ) : syllabus.length === 0 ? (
+                    <p className="px-4 py-6 text-sm text-muted-foreground">
+                      The instructor hasn't published the curriculum yet.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {syllabus.map((lesson) => (
+                        <div key={lesson.id} className="p-4 flex items-center justify-between group hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-2 w-2 shrink-0 rounded-full bg-primary/40" />
+                            <span className="text-sm text-foreground truncate">
+                              {lesson.section_title && (
+                                <span className="text-xs font-semibold uppercase tracking-wide text-primary mr-2">
+                                  {lesson.section_title}
+                                </span>
+                              )}
+                              {lesson.title}
+                            </span>
+                          </div>
+                          <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
                         </div>
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

@@ -21,5 +21,6 @@ class Lesson(Base):
     is_published = Column(Boolean, default=False)
     published_at = Column(DateTime, nullable=True)
     estimated_minutes = Column(Integer, default=5)
+    section_title = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

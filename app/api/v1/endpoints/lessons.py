@@ -61,8 +61,9 @@ async def list_course_lessons(
             duration_seconds=l.duration_seconds,
             is_published=l.is_published,
             published_at=l.published_at,
-            estimated_minutes=l.estimated_minutes,
-            created_at=l.created_at,
+        estimated_minutes=l.estimated_minutes,
+        section_title=l.section_title,
+        created_at=l.created_at,
         )
         for l in lessons
     ]
@@ -99,6 +100,7 @@ async def create_new_lesson(
         duration_seconds=lesson_data.duration_seconds,
         content_json=lesson_data.content_json,
         estimated_minutes=lesson_data.estimated_minutes,
+        section_title=lesson_data.section_title,
     )
 
     return LessonResponse(
@@ -116,6 +118,7 @@ async def create_new_lesson(
         is_published=lesson.is_published,
         published_at=lesson.published_at,
         estimated_minutes=lesson.estimated_minutes,
+        section_title=lesson.section_title,
         created_at=lesson.created_at,
     )
 
@@ -155,6 +158,7 @@ async def update_existing_lesson(
         content_json=lesson_data.content_json,
         estimated_minutes=lesson_data.estimated_minutes,
         is_published=lesson_data.is_published,
+        section_title=lesson_data.section_title,
     )
 
     return LessonResponse(
@@ -172,6 +176,7 @@ async def update_existing_lesson(
         is_published=updated.is_published,
         published_at=updated.published_at,
         estimated_minutes=updated.estimated_minutes,
+        section_title=updated.section_title,
         created_at=updated.created_at,
     )
 

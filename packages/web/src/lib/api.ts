@@ -215,12 +215,27 @@ export const userApi = {
 
 // Course endpoints
 export const courseApi = {
-  list: (params?: { skip?: number; limit?: number; featured?: boolean; mine?: boolean }) => {
+  list: (params?: {
+    skip?: number;
+    limit?: number;
+    featured?: boolean;
+    mine?: boolean;
+    search?: string;
+    level?: string;
+    min_price_cents?: number;
+    max_price_cents?: number;
+    sort?: 'popular' | 'rating' | 'price_asc' | 'price_desc' | 'newest';
+  }) => {
     const query = new URLSearchParams();
     if (params?.skip !== undefined) query.set('skip', String(params.skip));
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
     if (params?.featured !== undefined) query.set('featured', String(params.featured));
     if (params?.mine !== undefined) query.set('mine', String(params.mine));
+    if (params?.search) query.set('search', params.search);
+    if (params?.level) query.set('level', params.level);
+    if (params?.min_price_cents !== undefined) query.set('min_price_cents', String(params.min_price_cents));
+    if (params?.max_price_cents !== undefined) query.set('max_price_cents', String(params.max_price_cents));
+    if (params?.sort) query.set('sort', params.sort);
     return api.get<Array<{
       id: string;
       title: string;
@@ -605,6 +620,7 @@ export const lessonApi = {
       is_published: boolean;
       published_at: string | null;
       estimated_minutes: number;
+      section_title?: string | null;
       created_at: string;
     }>>(`/courses/lessons/course/${courseId}`),
 
@@ -617,6 +633,7 @@ export const lessonApi = {
     video_url?: string;
     duration_seconds?: number;
     estimated_minutes?: number;
+    section_title?: string;
   }) => api.post(`/courses/lessons`, data),
 
   update: (id: string, data: Record<string, unknown>) =>

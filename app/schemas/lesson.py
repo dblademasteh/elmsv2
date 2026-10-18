@@ -16,6 +16,7 @@ class LessonBase(BaseModel):
     content_json: Optional[str] = None
     estimated_minutes: int = 5
     is_published: Optional[bool] = None
+    section_title: Optional[str] = Field(None, max_length=255)
 
 
 class LessonCreate(LessonBase):
@@ -33,6 +34,7 @@ class LessonUpdate(BaseModel):
     content_json: Optional[str] = None
     estimated_minutes: Optional[int] = None
     is_published: Optional[bool] = None
+    section_title: Optional[str] = Field(None, max_length=255)
 
 
 class LessonResponse(LessonBase):
