@@ -71,6 +71,7 @@ async def list_course_quizzes(
             randomize_questions=q.randomize_questions,
             show_results=q.show_results,
             allow_retry=q.allow_retry,
+            quiz_type=q.quiz_type,
             created_at=q.created_at,
         )
         for q in quizzes
@@ -102,6 +103,7 @@ async def list_lesson_quizzes(
             randomize_questions=q.randomize_questions,
             show_results=q.show_results,
             allow_retry=q.allow_retry,
+            quiz_type=q.quiz_type,
             created_at=q.created_at,
         )
         for q in quizzes
