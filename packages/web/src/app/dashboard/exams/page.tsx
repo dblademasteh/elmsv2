@@ -206,7 +206,7 @@ export default function ExamsPage() {
         time_limit_seconds: data.time_limit_minutes * 60,
         max_attempts: data.max_attempts,
         passing_grade: data.passing_grade,
-        description: data.description.trim() || undefined,
+        description: data.description?.trim() || undefined,
       } as Parameters<typeof quizApi.create>[0])
       if (response.error) {
         toast({ title: "Failed to create exam", description: response.error, })
