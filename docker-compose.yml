@@ -58,8 +58,6 @@ services:
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api/v1}
     container_name: lms-web-dev
-    ports:
-      - "3000:3000"
     environment:
       - NODE_ENV=production
     depends_on:
