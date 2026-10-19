@@ -386,7 +386,7 @@ export const quizApi = {
       created_at: string;
     }>(`/courses/quizzes/${quizId}`),
 
-  create: (data: { lesson_id: string; title: string; questions: Array<Record<string, unknown>>; time_limit_seconds?: number; max_attempts?: number; passing_grade?: number }) =>
+  create: (data: { lesson_id: string; title: string; questions: Array<Record<string, unknown>>; description?: string; time_limit_seconds?: number; max_attempts?: number; passing_grade?: number; quiz_type?: string }) =>
     api.post(`/courses/quizzes`, data),
 
   update: (id: string, data: Record<string, unknown>) =>

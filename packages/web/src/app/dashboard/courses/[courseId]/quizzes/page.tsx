@@ -10,7 +10,8 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Plus, Trash2, Save, HelpCircle, AlertCircle } from "lucide-react"
 import type { ComponentType } from "react"
 
-type QuestionType = "multiple_choice" | "true_false" | "short_answer"
+type QuestionType = "multiple_choice" | "enumeration" | "identification" | "true_false" | "essay"
+type QuizType = "multiple_choice" | "enumeration" | "identification" | "true_false" | "essay"
 
 interface Question {
   id: string
@@ -30,6 +31,7 @@ interface Quiz {
   time_limit_seconds: number | null
   max_attempts: number
   passing_grade: number
+  quiz_type: QuizType
   randomize_questions: boolean
   show_results: boolean
   allow_retry: boolean
@@ -44,8 +46,10 @@ interface Lesson {
 
 const QUESTION_TYPES: { value: QuestionType; label: string; icon: ComponentType<any> }[] = [
   { value: "multiple_choice", label: "Multiple Choice", icon: HelpCircle },
+  { value: "enumeration", label: "Enumeration", icon: HelpCircle },
+  { value: "identification", label: "Identification", icon: HelpCircle },
   { value: "true_false", label: "True / False", icon: HelpCircle },
-  { value: "short_answer", label: "Short Answer", icon: HelpCircle },
+  { value: "essay", label: "Essay", icon: HelpCircle },
 ]
 
 export default function QuizManagementPage() {
@@ -98,6 +102,7 @@ export default function QuizManagementPage() {
       time_limit_seconds: null,
       max_attempts: 3,
       passing_grade: 70,
+      quiz_type: "multiple_choice",
       randomize_questions: false,
       show_results: true,
       allow_retry: true,
@@ -170,6 +175,7 @@ export default function QuizManagementPage() {
           time_limit_seconds: editingQuiz.time_limit_seconds ?? undefined,
           max_attempts: editingQuiz.max_attempts,
           passing_grade: editingQuiz.passing_grade,
+          quiz_type: editingQuiz.quiz_type,
         })
         if (resp.data) {
           setQuizzes([...quizzes, resp.data as unknown as Quiz])
@@ -187,6 +193,7 @@ export default function QuizManagementPage() {
           randomize_questions: editingQuiz.randomize_questions,
           show_results: editingQuiz.show_results,
           allow_retry: editingQuiz.allow_retry,
+          quiz_type: editingQuiz.quiz_type,
         })
         if (resp.data) {
           setQuizzes(quizzes.map(q => q.id === editingQuiz.id ? (resp.data as unknown as Quiz) : q))
@@ -274,6 +281,8 @@ export default function QuizManagementPage() {
                             <div>
                               <p className="font-medium">{quiz.title}</p>
                               <p className="text-sm text-muted-foreground">
+                                {quiz.quiz_type.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                                {" • "}
                                 {quiz.questions?.length || 0} questions
                                 {quiz.time_limit_seconds && ` • ${Math.floor(quiz.time_limit_seconds / 60)} min limit`}
                                 {` • Passing: ${quiz.passing_grade}%`}
@@ -337,6 +346,20 @@ export default function QuizManagementPage() {
                       placeholder="Optional description"
                       rows={2}
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Exam Type</label>
+                    <select
+                      value={editingQuiz.quiz_type}
+                      onChange={(e) => setEditingQuiz({ ...editingQuiz, quiz_type: e.target.value as QuizType })}
+                      className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
+                    >
+                      <option value="multiple_choice">Multiple Choice</option>
+                      <option value="enumeration">Enumeration</option>
+                      <option value="identification">Identification</option>
+                      <option value="true_false">True / False</option>
+                      <option value="essay">Essay</option>
+                    </select>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
@@ -489,7 +512,7 @@ export default function QuizManagementPage() {
                           </div>
                         )}
 
-                        {q.type === "short_answer" && (
+                        {q.type !== "multiple_choice" && q.type !== "true_false" && (
                           <input
                             type="text"
                             value={q.correct_answer || ""}
