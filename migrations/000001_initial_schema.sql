@@ -135,6 +135,7 @@ CREATE TABLE quizzes (
     time_limit_seconds INTEGER,
     max_attempts INTEGER DEFAULT 3,
     passing_grade DECIMAL(5,2) DEFAULT 70.00,
+    quiz_type VARCHAR(50) NOT NULL DEFAULT 'multiple_choice',
     randomize_questions BOOLEAN DEFAULT FALSE,
     show_results BOOLEAN DEFAULT TRUE,
     allow_retry BOOLEAN DEFAULT TRUE,

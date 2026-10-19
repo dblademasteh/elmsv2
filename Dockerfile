@@ -22,6 +22,7 @@ COPY --from=builder /install /usr/local
 COPY app ./app
 COPY scripts ./scripts
 COPY migrations ./migrations
+COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 
 RUN mkdir -p /app/uploads && chown -R appuser:appuser /app
