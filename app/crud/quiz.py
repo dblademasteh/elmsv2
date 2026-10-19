@@ -47,6 +47,7 @@ async def create_quiz(
     randomize_questions: bool = False,
     show_results: bool = True,
     allow_retry: bool = True,
+    quiz_type: str = "multiple_choice",
 ) -> Quiz:
     """Create a new quiz for a lesson."""
     db_quiz = Quiz(
@@ -60,6 +61,7 @@ async def create_quiz(
         randomize_questions=randomize_questions,
         show_results=show_results,
         allow_retry=allow_retry,
+        quiz_type=quiz_type,
     )
     db.add(db_quiz)
     await db.commit()
@@ -79,6 +81,7 @@ async def update_quiz(
     randomize_questions: bool = None,
     show_results: bool = None,
     allow_retry: bool = None,
+    quiz_type: str = None,
 ) -> Optional[Quiz]:
     """Update an existing quiz."""
     quiz = await get_quiz_by_id(db, quiz_id)
@@ -103,6 +106,8 @@ async def update_quiz(
         quiz.show_results = show_results
     if allow_retry is not None:
         quiz.allow_retry = allow_retry
+    if quiz_type is not None:
+        quiz.quiz_type = quiz_type
 
     await db.commit()
     await db.refresh(quiz)

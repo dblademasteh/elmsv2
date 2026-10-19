@@ -23,6 +23,7 @@ const createExamSchema = z.object({
   lesson_id: z.string().min(1, "Select a lesson"),
   title: z.string().min(3, "Exam title must be at least 3 characters"),
   description: z.string().optional(),
+  exam_type: z.enum(["multiple_choice", "enumeration", "identification", "true_false", "essay"]).default("multiple_choice"),
   time_limit_minutes: z.coerce.number().min(1, "Time must be at least 1 minute"),
   max_attempts: z.coerce.number().min(1, "Max attempts must be at least 1"),
   passing_grade: z.coerce.number().min(0).max(100, "Passing grade must be between 0 and 100"),
@@ -45,6 +46,7 @@ type QuizRow = {
   course_id: string
   course_title: string
   lesson_title: string
+  quiz_type: string
 }
 
 export default function ExamsPage() {
@@ -69,6 +71,7 @@ export default function ExamsPage() {
       lesson_id: "",
       title: "",
       description: "",
+      exam_type: "multiple_choice",
       time_limit_minutes: 60,
       max_attempts: 3,
       passing_grade: 70,
@@ -110,6 +113,7 @@ export default function ExamsPage() {
               course_id: course.id,
               course_title: course.title,
               lesson_title: lessonTitles.get(q.lesson_id) || "—",
+              quiz_type: q.quiz_type ?? "multiple_choice",
             }))
           }),
         ).then((groups) => {
@@ -154,6 +158,7 @@ export default function ExamsPage() {
               course_id: course.course_id,
               course_title: course.course_title,
               lesson_title: lessonTitles.get(q.lesson_id) || "—",
+              quiz_type: q.quiz_type ?? "multiple_choice",
             }))
           }),
         ).then((groups) => {
@@ -207,13 +212,14 @@ export default function ExamsPage() {
         max_attempts: data.max_attempts,
         passing_grade: data.passing_grade,
         description: data.description?.trim() || undefined,
+        quiz_type: data.exam_type,
       } as Parameters<typeof quizApi.create>[0])
       if (response.error) {
         toast({ title: "Failed to create exam", description: response.error, })
         return
       }
       setDialogOpen(false)
-      form.reset({ lesson_id: "", title: "", description: "", time_limit_minutes: 60, max_attempts: 3, passing_grade: 70 })
+      form.reset({ lesson_id: "", title: "", description: "", exam_type: "multiple_choice", time_limit_minutes: 60, max_attempts: 3, passing_grade: 70 })
       setLessons([])
       load()
       toast({ title: "Exam created" })
@@ -297,6 +303,7 @@ export default function ExamsPage() {
               <thead className="border-b border-border bg-muted/50">
                 <tr>
                   <th className="w-[220px] px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Exam</th>
+                  <th className="w-20 px-6 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
                   <th className="w-24 px-6 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Questions</th>
                   <th className="w-20 px-6 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Time</th>
                   <th className="w-20 px-6 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Passing</th>
@@ -317,6 +324,9 @@ export default function ExamsPage() {
                           </p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <Badge variant="outline">{exam.quiz_type.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}</Badge>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <Badge variant="secondary">{exam.question_count}</Badge>
@@ -421,6 +431,28 @@ export default function ExamsPage() {
                           {l.title}
                         </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="exam-type">Exam type</Label>
+              <Controller
+                name="exam_type"
+                control={form.control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full" id="exam-type">
+                      <SelectValue placeholder={field.value === "multiple_choice" ? "Select an exam type…" : field.value} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                      <SelectItem value="enumeration">Enumeration</SelectItem>
+                      <SelectItem value="identification">Identification</SelectItem>
+                      <SelectItem value="true_false">True / False</SelectItem>
+                      <SelectItem value="essay">Essay</SelectItem>
                     </SelectContent>
                   </Select>
                 )}

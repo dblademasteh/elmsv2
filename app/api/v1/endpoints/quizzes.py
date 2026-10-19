@@ -148,6 +148,7 @@ async def create_new_quiz(
         randomize_questions=quiz_data.get("randomize_questions", False),
         show_results=quiz_data.get("show_results", True),
         allow_retry=quiz_data.get("allow_retry", True),
+        quiz_type=quiz_data.get("quiz_type", "multiple_choice"),
     )
 
     return QuizResponse(
@@ -162,6 +163,7 @@ async def create_new_quiz(
         randomize_questions=quiz.randomize_questions,
         show_results=quiz.show_results,
         allow_retry=quiz.allow_retry,
+        quiz_type=quiz.quiz_type,
         created_at=quiz.created_at,
     )
 

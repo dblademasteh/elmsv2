@@ -19,6 +19,7 @@ class Quiz(Base):
     randomize_questions = Column(Boolean, default=False)
     show_results = Column(Boolean, default=True)
     allow_retry = Column(Boolean, default=True)
+    quiz_type = Column(String(50), default="multiple_choice")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

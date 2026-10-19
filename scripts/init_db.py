@@ -31,6 +31,7 @@ async def init_db():
     # Lightweight column migrations (create_all does not alter existing tables)
     alter_statements = [
         "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS section_title VARCHAR(255)",
+        "ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS quiz_type VARCHAR(50) DEFAULT 'multiple_choice'",
     ]
     async with engine.begin() as conn:
         for statement in alter_statements:

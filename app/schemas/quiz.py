@@ -31,6 +31,7 @@ class QuizBase(BaseModel):
     randomize_questions: bool = False
     show_results: bool = True
     allow_retry: bool = True
+    quiz_type: str = Field(default="multiple_choice", description="Exam type: multiple_choice, enumeration, identification, true_false, essay")
 
 
 class QuizCreate(QuizBase):
