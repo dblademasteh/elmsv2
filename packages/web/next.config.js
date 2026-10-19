@@ -30,6 +30,15 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1',
   },
+  async rewrites() {
+    const apiUrl = process.env.INTERNAL_API_URL || 'http://api:8080/api/v1';
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: `${apiUrl}/:path*`,
+      },
+    ];
+  },
   // Webpack alias configuration for @/ imports
   webpack: (config) => {
     config.resolve.alias['@'] = path.resolve(__dirname, 'src');

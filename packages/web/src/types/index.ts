@@ -75,6 +75,7 @@ export interface Quiz {
   time_limit_seconds?: number;
   max_attempts: number;
   passing_grade: number;
+  quiz_type: string;
 }
 
 export interface QuizAttempt {

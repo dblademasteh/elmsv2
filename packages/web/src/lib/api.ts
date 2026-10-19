@@ -345,6 +345,7 @@ export const quizApi = {
       time_limit_seconds: number | null;
       max_attempts: number;
       passing_grade: number;
+      quiz_type: string;
       randomize_questions: boolean;
       show_results: boolean;
       allow_retry: boolean;
@@ -361,6 +362,7 @@ export const quizApi = {
       time_limit_seconds: number | null;
       max_attempts: number;
       passing_grade: number;
+      quiz_type: string;
       randomize_questions: boolean;
       show_results: boolean;
       allow_retry: boolean;
@@ -377,6 +379,7 @@ export const quizApi = {
       time_limit_seconds: number | null;
       max_attempts: number;
       passing_grade: number;
+      quiz_type: string;
       randomize_questions: boolean;
       show_results: boolean;
       allow_retry: boolean;
