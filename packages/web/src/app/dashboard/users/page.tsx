@@ -76,7 +76,9 @@ export default function DashboardUsersPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [updating, setUpdating] = useState<string | null>(null)
+  // A set, not a single id: two rows can be updated at the same time and a
+  // single id would let the first response clear the second row's spinner.
+  const [updating, setUpdating] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadUsers()
@@ -95,14 +97,19 @@ export default function DashboardUsersPage() {
   }
 
   async function updateUser(userId: string, data: { role?: string; is_active?: boolean; is_verified?: boolean }) {
-    setUpdating(userId)
+    setUpdating((prev) => new Set(prev).add(userId))
+    setError(null)
     const resp = await userApi.update(userId, data)
     if (resp.data) {
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...resp.data } as User : u)))
     } else {
       setError(resp.error || "Failed to update user")
     }
-    setUpdating(null)
+    setUpdating((prev) => {
+      const next = new Set(prev)
+      next.delete(userId)
+      return next
+    })
   }
 
   const filtered = users.filter((u) => {
@@ -292,14 +299,14 @@ export default function DashboardUsersPage() {
                               <input
                                 type="checkbox"
                                 checked={u.is_active}
-                                disabled={updating === u.id}
+                                disabled={updating.has(u.id)}
                                 onChange={(e) => updateUser(u.id, { is_active: e.target.checked })}
                                 className="sr-only"
                                 aria-label={`Toggle active for ${u.full_name}`}
                               />
                               <span
                                 className={`absolute inset-0 rounded-full ${u.is_active ? "bg-primary" : "bg-muted"} ${
-                                  updating === u.id ? "opacity-50" : ""
+                                  updating.has(u.id) ? "opacity-50" : ""
                                 }`}
                               />
                               <span
@@ -310,7 +317,7 @@ export default function DashboardUsersPage() {
                             </label>
                             <select
                               value={u.role}
-                              disabled={updating === u.id || currentUser?.role !== "admin"}
+                              disabled={updating.has(u.id) || currentUser?.role !== "admin"}
                               onChange={(e) => updateUser(u.id, { role: e.target.value })}
                               className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/20 disabled:opacity-50"
                               aria-label={`Change role for ${u.full_name}`}
@@ -319,7 +326,7 @@ export default function DashboardUsersPage() {
                               <option value="instructor">Instructor</option>
                               <option value="admin">Admin</option>
                             </select>
-                            {updating === u.id && (
+                            {updating.has(u.id) && (
                               <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden="true" />
                             )}
                           </div>

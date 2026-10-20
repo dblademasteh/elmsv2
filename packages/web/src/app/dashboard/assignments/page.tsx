@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { assignmentApi, enrollmentApi, fileApi } from "@/lib/api"
+import { fileNameFromUrl, safeExternalUrl } from "@/lib/urls"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -179,8 +180,13 @@ export default function StudentAssignmentsPage() {
     if (selectedFile) {
       url = "" // filled after upload
     } else if (externalUrl.trim()) {
-      url = externalUrl.trim()
-      name = url.split("/").pop() || "submission"
+      const safe = safeExternalUrl(externalUrl)
+      if (!safe) {
+        setFileError("Enter a valid http:// or https:// file URL")
+        return
+      }
+      url = safe
+      name = fileNameFromUrl(safe)
     } else {
       setFileError("Choose a file to upload, or enter a file URL")
       return

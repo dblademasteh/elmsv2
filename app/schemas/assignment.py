@@ -1,8 +1,10 @@
 """Assignment schemas"""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 import uuid
+
+from app.core.urls import UnsafeUrlError, safe_external_url
 
 
 class AssignmentBase(BaseModel):
@@ -76,6 +78,23 @@ class AssignmentSubmissionCreate(BaseModel):
     file_url: str
     file_name: str
     file_size_bytes: int = 0
+
+    @field_validator("file_url")
+    @classmethod
+    def _validate_file_url(cls, value: str) -> str:
+        """Reject URLs a staff member would later click as a "file".
+
+        The submission URL is student-controlled and is rendered as a link
+        in the instructor's grading view, so only http(s) URLs and
+        same-origin paths are accepted.
+        """
+        try:
+            safe = safe_external_url(value)
+        except UnsafeUrlError as exc:
+            raise ValueError(str(exc)) from exc
+        if not safe:
+            raise ValueError("A file URL is required")
+        return safe
 
 
 class AssignmentSubmissionGrade(BaseModel):

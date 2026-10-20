@@ -19,9 +19,13 @@
 | B4 | `/dashboard/users` admits instructors (H7) | **Fixed** — `app/dashboard/users/page.tsx`, `components/layout/sidebar.tsx` |
 | B5 | Student course search is a no-op (H5) | **Fixed** — `app/dashboard/courses/page.tsx` |
 | B6 | A lesson can never be published — the Content page is read-only | **Fixed** — `app/dashboard/content/page.tsx`, `app/api/v1/endpoints/lessons.py`, `app/crud/lesson.py` (+ regression test) |
-| H1, H2, H3, H6, H9–H13, all P2/P3 | everything else | Open |
+| H1 | A failed quiz submission replaces the form with a dead end | **Fixed** — `app/dashboard/quizzes/[quizId]/take/page.tsx` |
+| H6 | A student-controlled URL is rendered as a trusted link for instructors | **Fixed** — `app/core/urls.py`, `app/schemas/assignment.py`, `lib/urls.ts` (+ regression tests) |
+| H9 | Notifications are not navigable | **Fixed** — `app/dashboard/notifications/page.tsx` |
+| H10 | Mutations are applied locally even when the API rejects them | **Fixed** — `app/dashboard/courses/[courseId]/assignments/page.tsx`, `app/dashboard/courses/[courseId]/quizzes/page.tsx`, `app/dashboard/notifications/page.tsx`, `app/dashboard/users/page.tsx` |
+| H2, H3, H11–H13, all P2/P3 | everything else | Open |
 
-Verification of the four fixes: ESLint unchanged (8 output lines = the 7 pre-existing warnings, 0 errors), `next build` compiles clean, backend suite `35 passed` (each new test fails with its fix stashed), and the Select/Toaster fixes were exercised with throwaway SSR and jsdom harnesses (selected label rendered, placeholder only when empty, no duplicate `id`, toast title/description in the DOM, toasts fired before the Toaster mounts are queued and flushed). B1 and B2 were additionally confirmed against the live stack (`docker compose up`): the enumeration attempt now scores 100 instead of 75, and a password change without/with the wrong current password is rejected with 400. B6 was confirmed the same way — a draft lesson becomes visible to a student only after an explicit publish, and disappears again when it is unpublished. The frontend still has no unit-test runner — `npm test` has no Jest config, `jest-environment-jsdom` or testing-library in `devDependencies`.
+Verification of the four fixes: ESLint unchanged (8 output lines = the 7 pre-existing warnings, 0 errors), `next build` compiles clean, backend suite `35 passed` (each new test fails with its fix stashed), and the Select/Toaster fixes were exercised with throwaway SSR and jsdom harnesses (selected label rendered, placeholder only when empty, no duplicate `id`, toast title/description in the DOM, toasts fired before the Toaster mounts are queued and flushed). B1 and B2 were additionally confirmed against the live stack (`docker compose up`): the enumeration attempt now scores 100 instead of 75, and a password change without/with the wrong current password is rejected with 400. B6 was confirmed the same way — a draft lesson becomes visible to a student only after an explicit publish, and disappears again when it is unpublished. H6 was confirmed the same way: `javascript:`, `data:`, `file:`, `//host/x` and `ftp:` submissions are all rejected with 422, while `https://example.com/work.zip` is accepted, stored and shown to the instructor. The backend suite is now `38 passed`. The frontend still has no unit-test runner — `npm test` has no Jest config, `jest-environment-jsdom` or testing-library in `devDependencies`.
 
 ---
 
@@ -143,19 +147,19 @@ Backend (`app/api/v1/endpoints/courses.py:48-59`): with `mine=true` the instruct
 
 ### H1 · A failed quiz submission replaces the form with a dead-end error card
 **`src/app/dashboard/quizzes/[quizId]/take/page.tsx`** — render order is `loading → error → result → quiz` (`:174, :187, :205, :271`). `handleSubmit` sets `error` on failure (`:146-151`), so the error branch wins and the quiz form is replaced by a card whose only action is `router.back()`. The student cannot retry from the page and their answers are unreachable.
-**Fix:** split `loadError` (blocking) from `submitError` (inline banner over the form); keep the form mounted so the student can retry (the `submittingRef` double-submit guard already exists).
+**Fix (done):** split `loadError` (blocking) from `submitError` (inline banner over the form); keep the form mounted so the student can retry (the `submittingRef` double-submit guard already exists). The banner says the answers are still there and the Submit button stays enabled.
 
 ### H2 · The forgot-password flow cannot be completed in production
 **`src/app/forgot-password/page.tsx:39-42, :133-137`** — after requesting a reset the UI *always* advances to the reset step and asks the user to "Paste the token from your email". The backend only returns `reset_token` inline in development (`DEBUG_RESET_TOKEN`); there is no mail service, so in production the token is never delivered and never arrives. The page also never reads a token from the URL.
 **Fix:** in production, stay on an "check your email" confirmation step; add `/forgot-password/reset` that reads `reset_token` from `useSearchParams` and pre-fills the field; gate the dev prefill behind `ENVIRONMENT === development`.
 
 ### H3 · The login page ships rotated seed credentials in the client bundle
-**`src/app/login/page.tsx:23-27`** — the "Quick access" panel hard-codes `admin@lms.com / Admin123!@#`, `instructor@lms.com / Instructor123!@#`, `student@lms.com / Student123!@#`. Those passwords were rotated (`Admin123!@#` → `LmsAdmin#2026`, etc.), so clicking a role button fills a password that now **always fails with 401**, and the credentials are readable in the shipped JavaScript.
+**`src/app/login/page.tsx:23-27`** — the "Quick access" panel hard-codes `admin@lms.com / Admin123!@#`, `instructor@lms.com / Instructor123!@#`, `student@lms.com / Student123!@#`. Those passwords are the live seed passwords (`scripts/init_db.py`), so clicking a role button does log in — but the credentials are readable in the shipped JavaScript, and the panel stays in the bundle on a public deployment.
 **Fix:** delete the panel from the production bundle (gate on `NEXT_PUBLIC_ENV !== "production"`), and rotate the seed accounts per AGENTS.md before any deployment.
 
 ### H4 · The profile password form never verifies the current password
 **`src/app/profile/page.tsx:77` (validation), `:92-94` (request), `:275` (input)** — the "Current password" field is required by the form but is never sent. `authApi.updateProfile({ password })` → `PUT /users/me` → `app/schemas/user.py:14-21` has no current-password field and `app/api/v1/endpoints/users.py:71-73` hashes the new password directly. Anyone holding a valid JWT can rotate the account password without knowing the current one; the field is decorative.
-**Fix:** add `current_password` to the request, verify it server-side before applying the change, and surface the real error.
+**Fix (done — see B2):** `current_password` is now part of `UserUpdate`, the endpoint rejects a missing or wrong current password with 400, and the client sends the value it already collects.
 
 ### H5 · The student "Search courses" box does nothing
 **`src/app/dashboard/courses/page.tsx:195-241`** — the student branch (`if (!isManager)`) computes `filtered` (`:190`) but renders `courses.map(...)` (`:241`). A search that matches nothing shows *"No courses available."* **above the full unfiltered list**. The manager branch (`:327`) correctly uses `filtered.map`.
@@ -164,7 +168,7 @@ Backend (`app/api/v1/endpoints/courses.py:48-59`): with `mine=true` the instruct
 ### H6 · A student-controlled URL is rendered as a trusted link for instructors
 **`src/app/dashboard/assignments/page.tsx:181-183` → `src/app/dashboard/courses/[courseId]/assignments/page.tsx:318-327`**
 `url = externalUrl.trim()` is stored verbatim (`app/schemas/assignment.py:75-78`: `file_url: str`, no validator) and later rendered as `<a href={s.file_url} target="_blank">` in the staff submissions view. Any scheme a student types (`data:`, `file:`, an internal host) reaches staff as a legitimate-looking attachment link.
-**Fix:** allow-list `http(s)` only — validate client-side *and* server-side, and normalise with `new URL()` before rendering the anchor.
+**Fix (done):** the scheme is allow-listed on both sides. `app/core/urls.py` accepts only absolute `http(s)` URLs with a host plus root-relative same-origin paths, and rejects `//host/x` and `/\host/x` (browsers resolve those as protocol-relative, so they leave the site). `AssignmentSubmissionCreate.file_url` runs it as a Pydantic validator, so a bad scheme is a 422 instead of a stored payload. The client mirrors it in `src/lib/urls.ts`: the submit form rejects a non-http(s) URL before sending it, and the grading view renders an untrusted URL as plain text instead of a link.
 
 ### H7 · `/dashboard/users` admits instructors, but the API is admin-only
 **`src/app/dashboard/users/page.tsx:117`** allows `admin` **or** `instructor`; `app/api/v1/endpoints/users.py:104-111` returns 403 for non-admins, and `PUT /users/{id}` is admin-only too. Instructors get the full table UI, a permanent 403 and an error banner; `src/components/layout/sidebar.tsx:56` still links "Users" to instructors.
@@ -176,14 +180,14 @@ Backend (`app/api/v1/endpoints/courses.py:48-59`): with `mine=true` the instruct
 
 ### H9 · Notifications are not navigable
 **`src/app/dashboard/notifications/page.tsx:234-261`** — the API returns `link_url` for every notification (`app/api/v1/endpoints/notifications.py:48`) and the app bar navigates to it (`src/components/layout/appbar.tsx:164`), but the notifications page only marks the item read. The user must hunt for the target manually.
-**Fix:** on click, `markRead(n)` **and** `router.push(n.link_url ?? "/dashboard/notifications")`.
+**Fix (done):** clicking a notification now marks it read *and* `router.push(n.link_url ?? "/dashboard/notifications")`, matching the app bar.
 
 ### H10 · Mutations are applied locally even when the API rejects them
 - `src/app/dashboard/courses/[courseId]/assignments/page.tsx:162-168` — `await assignmentApi.delete(a.id)` result never inspected, then the row is removed from state. `src/lib/api.ts` resolves to `{ error }` instead of throwing, so a 403 ("You don't own this assignment") silently removes the item.
 - `src/app/dashboard/notifications/page.tsx:157-161` — same for announcements; `.catch(() => {})` never fires because the client does not reject.
 - `src/app/dashboard/courses/[courseId]/quizzes/page.tsx:118-123` — same for quiz deletion.
 - `src/app/dashboard/users/page.tsx:97-106` — a single `updating` id is clobbered when two updates overlap.
-**Fix:** inspect `resp.error` before mutating local state; revert optimistic updates on failure and surface a toast (once C1 is fixed).
+**Fix (done):** every delete now inspects `resp.error` before touching local state and reports the failure with a toast; the local-state updates use the functional form so a concurrent update cannot be lost. `updating` became a `Set<string>`, so two rows can be updated at once without the first response clearing the second row's spinner.
 
 ### H11 · Due dates are shifted by the UTC/local mismatch
 **`src/app/dashboard/courses/[courseId]/assignments/page.tsx:504-509`** — `new Date(due_date).toISOString().slice(0,16)` formats **UTC** into a `<input type="datetime-local">`, which expects **local** time. In Asia/Manila (UTC+8) an 08:00 due date displays as 00:00; on save the naive local string is posted verbatim and stored as UTC, shifting it again.
@@ -324,3 +328,5 @@ The three `exhaustive-deps` findings are the same class of bug as H1/H10 (stale 
 
 ### Suggested fix order
 `C1 → C2 → C3 → C4` (each is small and self-contained) → `H1, H2, H3, H4` (correctness/security) → `H5-H12` → shared loader + primitive cleanups → P3 sweep.
+
+Done so far: `C1–C4`, `H1`, `H4` (via B2), `H5` (via B5), `H6`, `H7` (via B4), `H8` (via B3), `H9`, `H10`, plus `B1`–`B6`. Still open: `H2`, `H3`, `H11`, `H12`, `H13` and the P2/P3 lists.

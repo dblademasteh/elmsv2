@@ -4,11 +4,13 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { useAuthStore } from "@/store/auth"
 import { assignmentApi, lessonApi, courseApi } from "@/lib/api"
+import { safeExternalUrl } from "@/lib/urls"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Plus, Trash2, Save, AlertCircle, Calendar, Upload, FileText, CheckCircle, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { toast } from "@/components/ui/use-toast"
 
 interface GradingFormProps {
   submission: Submission
@@ -54,6 +56,45 @@ interface Lesson {
   id: string
   title: string
   position: number
+}
+
+/**
+ * The link to a student's submitted file.
+ *
+ * `file_url` is student-controlled, so it is normalised before it reaches an
+ * `href`; a URL that is not a plain http(s) link is shown as plain text
+ * instead of being turned into a clickable target.
+ */
+function SubmissionFileLink({ submission }: { submission: Submission }) {
+  const url = safeExternalUrl(submission.file_url)
+  const label = (
+    <>
+      <FileText className="h-4 w-4" />
+      {submission.file_name} ({(submission.file_size_bytes / 1024).toFixed(1)} KB)
+    </>
+  )
+
+  if (!url) {
+    return (
+      <span
+        className="text-sm text-muted-foreground flex items-center gap-1"
+        title="This URL cannot be opened as a link"
+      >
+        {label}
+      </span>
+    )
+  }
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-sm text-blue-500 hover:underline flex items-center gap-1"
+    >
+      {label}
+    </a>
+  )
 }
 
 interface Assignment {
@@ -162,9 +203,13 @@ export default function AssignmentManagementPage() {
   async function handleDeleteAssignment(a: Assignment) {
     if (!confirm(`Delete assignment "${a.title}"?`)) return
     setDeletingId(a.id)
-    await assignmentApi.delete(a.id)
-    setAssignments(assignments.filter(x => x.id !== a.id))
+    const resp = await assignmentApi.delete(a.id)
     setDeletingId(null)
+    if (resp.error) {
+      toast({ title: "Could not delete assignment", description: resp.error })
+      return
+    }
+    setAssignments((prev) => prev.filter(x => x.id !== a.id))
   }
 
   async function handleViewSubmissions(a: Assignment) {
@@ -315,17 +360,7 @@ export default function AssignmentManagementPage() {
                           Submitted: {s.submitted_at ? new Date(s.submitted_at).toLocaleString() : "Not yet"}
                           {s.is_late && <span className="text-red-500 ml-2">(Late)</span>}
                         </p>
-                        {s.file_url && (
-                          <a
-                            href={s.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-500 hover:underline flex items-center gap-1"
-                          >
-                            <FileText className="h-4 w-4" />
-                            {s.file_name} ({(s.file_size_bytes / 1024).toFixed(1)} KB)
-                          </a>
-                        )}
+                        {s.file_url && <SubmissionFileLink submission={s} />}
                       </div>
                       <div className="ml-4 text-right min-w-[120px]">
                         {s.score !== null ? (

@@ -133,3 +133,86 @@ def test_assignment_grading_notifies_student(client, auth_headers):
     notifications = client.get("/api/v1/notifications/", headers=auth_headers["student"]).json()
     grade_notes = [n for n in notifications["notifications"] if n["type"] == "grade"]
     assert any("Graded Task" in n["title"] for n in grade_notes)
+
+
+def _assignable_assignment(client, auth_headers):
+    """A published course + lesson + published assignment for a student."""
+    course_id = _published_course(
+        client, auth_headers["instructor"], f"URL Course {uuid.uuid4().hex[:6]}"
+    )
+    client.post(
+        "/api/v1/enrollments/", headers=auth_headers["student"], json={"course_id": course_id}
+    )
+    lesson = client.post(
+        "/api/v1/courses/lessons",
+        headers=auth_headers["instructor"],
+        json={"course_id": course_id, "title": "File Lesson", "is_published": True},
+    )
+    assert lesson.status_code == 201, lesson.text
+    assignment = client.post(
+        "/api/v1/courses/assignments",
+        headers=auth_headers["instructor"],
+        json={
+            "lesson_id": lesson.json()["id"],
+            "title": "File Task",
+            "max_score": 100,
+            "is_published": True,
+        },
+    )
+    assert assignment.status_code == 201, assignment.text
+    return course_id, assignment.json()["id"]
+
+
+def test_submission_file_url_rejects_unsafe_schemes(client, auth_headers):
+    """A student-controlled URL must not reach staff as a clickable link.
+
+    The submission URL is rendered as an ``href`` in the instructor's
+    grading view, so only http(s) URLs and same-origin paths are accepted.
+    """
+    _, assignment_id = _assignable_assignment(client, auth_headers)
+
+    unsafe_urls = [
+        "javascript:alert(document.cookie)",
+        "JaVaScRiPt:alert(1)",
+        "java\nscript:alert(1)",
+        "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+        "file:///etc/passwd",
+        "vbscript:msgbox(1)",
+        "//evil.example/payload.exe",
+        "/\\evil.example/payload.exe",
+        "ftp://example.com/secret.txt",
+    ]
+
+    for url in unsafe_urls:
+        response = client.post(
+            f"/api/v1/courses/assignments/{assignment_id}/submit",
+            headers=auth_headers["student"],
+            json={
+                "file_url": url,
+                "file_name": "work.zip",
+                "file_size_bytes": 1024,
+            },
+        )
+        assert response.status_code == 422, f"{url!r} was accepted: {response.text}"
+
+
+def test_submission_accepts_safe_file_urls(client, auth_headers):
+    """http(s) URLs and same-origin paths are still accepted and stored."""
+    _, assignment_id = _assignable_assignment(client, auth_headers)
+
+    for url in (
+        "https://example.com/work.zip",
+        "http://example.com/work.zip",
+        "/uploads/deadbeef.zip",
+    ):
+        response = client.post(
+            f"/api/v1/courses/assignments/{assignment_id}/submit",
+            headers=auth_headers["student"],
+            json={
+                "file_url": url,
+                "file_name": "work.zip",
+                "file_size_bytes": 1024,
+            },
+        )
+        assert response.status_code in (200, 201), f"{url!r} was rejected: {response.text}"
+        assert response.json()["file_url"] == url

@@ -55,7 +55,10 @@ export default function TakeQuizPage() {
   const [loading, setLoading] = useState(true)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // A load failure is blocking (there is no quiz to show); a submit failure
+  // is not — the student keeps their answers and can try again.
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [result, setResult] = useState<QuizResult | null>(null)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [attemptId, setAttemptId] = useState<string | null>(null)
@@ -72,7 +75,8 @@ export default function TakeQuizPage() {
     setQuiz(null)
     setAnswers({})
     setSubmitting(false)
-    setError(null)
+    setLoadError(null)
+    setSubmitError(null)
     setResult(null)
     setTimeLeft(null)
     setAttemptId(null)
@@ -85,7 +89,7 @@ export default function TakeQuizPage() {
     try {
       const resp = await quizApi.getById(quizId)
       if (!resp.data) {
-        setError(resp.error || "Failed to load quiz")
+        setLoadError(resp.error || "Failed to load quiz")
         return
       }
       setQuiz(resp.data as unknown as Quiz)
@@ -93,7 +97,7 @@ export default function TakeQuizPage() {
       // Start (or resume) the attempt so the server can enforce the time limit
       const startResp = await quizApi.startAttempt(quizId)
       if (!startResp.data) {
-        setError(startResp.error || "Unable to start this exam")
+        setLoadError(startResp.error || "Unable to start this exam")
         return
       }
       setAttemptId(startResp.data.attempt_id)
@@ -104,7 +108,7 @@ export default function TakeQuizPage() {
         setTimeLeft(remaining !== null && remaining !== undefined ? remaining : limit)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load quiz")
+      setLoadError(err instanceof Error ? err.message : "Failed to load quiz")
     } finally {
       setLoading(false)
     }
@@ -122,6 +126,7 @@ export default function TakeQuizPage() {
     if (!quiz || !quizId || submittingRef.current || result) return
     submittingRef.current = true
     setSubmitting(true)
+    setSubmitError(null)
 
     try {
       const answerList = displayQuestions.map((q) => {
@@ -141,10 +146,10 @@ export default function TakeQuizPage() {
         setResult(resp.data as unknown as QuizResult)
         setTimeLeft(null)
       } else {
-        setError(resp.error || "Failed to submit quiz")
+        setSubmitError(resp.error || "Failed to submit quiz")
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit quiz")
+      setSubmitError(err instanceof Error ? err.message : "Failed to submit quiz")
     } finally {
       submittingRef.current = false
       setSubmitting(false)
@@ -184,14 +189,14 @@ export default function TakeQuizPage() {
     )
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <DashboardLayout>
         <div className="max-w-2xl mx-auto p-6">
           <Card>
             <CardContent className="pt-6">
               <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-3" />
-              <p className="text-center text-destructive">{error}</p>
+              <p className="text-center text-destructive">{loadError}</p>
               <div className="flex justify-center mt-4">
                 <Button onClick={() => router.back()}>Go Back</Button>
               </div>
@@ -297,6 +302,18 @@ export default function TakeQuizPage() {
 
         {quiz.description && (
           <p className="text-muted-foreground mb-6">{quiz.description}</p>
+        )}
+
+        {submitError && (
+          <div
+            role="alert"
+            className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            <p className="font-medium">{submitError}</p>
+            <p className="mt-1 text-muted-foreground">
+              Your answers are still here — fix the problem below and submit again.
+            </p>
+          </div>
         )}
 
         <form onSubmit={(e) => { e.preventDefault(); void handleSubmit() }} className="space-y-6">

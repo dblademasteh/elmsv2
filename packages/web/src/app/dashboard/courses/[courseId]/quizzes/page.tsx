@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Plus, Trash2, Save, AlertCircle, ClipboardList } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
 
 type QuestionType = "multiple_choice" | "enumeration" | "identification" | "true_false" | "essay"
 type QuizType = "multiple_choice" | "enumeration" | "identification" | "true_false" | "essay"
@@ -117,9 +118,13 @@ export default function QuizManagementPage() {
   async function handleDeleteQuiz(quiz: Quiz) {
     if (!confirm(`Delete quiz "${quiz.title}"?`)) return
     setDeletingQuiz(quiz.id)
-    await quizApi.delete(quiz.id)
-    setQuizzes(quizzes.filter(q => q.id !== quiz.id))
+    const resp = await quizApi.delete(quiz.id)
     setDeletingQuiz(null)
+    if (resp.error) {
+      toast({ title: "Could not delete quiz", description: resp.error })
+      return
+    }
+    setQuizzes((prev) => prev.filter(q => q.id !== quiz.id))
   }
 
   function addQuestion() {

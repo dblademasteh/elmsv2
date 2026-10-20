@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
 import {
   Dialog,
   DialogContent,
@@ -46,6 +48,7 @@ function timeAgo(iso: string | null): string {
 
 export default function NotificationsPage() {
   const { user } = useAuthStore()
+  const router = useRouter()
   const [tab, setTab] = useState<Tab>("notifications")
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -113,6 +116,18 @@ export default function NotificationsPage() {
     await notificationApi.markRead(notification.id).catch(() => {})
   }
 
+  /**
+   * Mark the notification read and take the user to whatever it points at.
+   *
+   * The API returns a `link_url` for every notification and the app bar
+   * already navigates to it; the list did not, so the target of a
+   * notification had to be found by hand.
+   */
+  async function openNotification(notification: AppNotification) {
+    await markRead(notification)
+    router.push(notification.link_url || "/dashboard/notifications")
+  }
+
   async function markAllRead() {
     setNotifications((prev) =>
       prev.map((n) => ({ ...n, read_at: n.read_at ?? new Date().toISOString() }))
@@ -156,7 +171,11 @@ export default function NotificationsPage() {
 
   async function handleDelete(announcement: Announcement) {
     if (!window.confirm("Delete this announcement?")) return
-    await announcementApi.remove(announcement.id).catch(() => {})
+    const resp = await announcementApi.remove(announcement.id)
+    if (resp.error) {
+      toast({ title: "Could not delete announcement", description: resp.error })
+      return
+    }
     setAnnouncements((prev) => prev.filter((a) => a.id !== announcement.id))
   }
 
@@ -235,7 +254,7 @@ export default function NotificationsPage() {
               {notifications.map((n) => (
                 <li key={n.id}>
                   <button
-                    onClick={() => markRead(n)}
+                    onClick={() => openNotification(n)}
                     className={`w-full rounded-xl border px-5 py-4 text-left transition-colors ${
                       n.read_at
                         ? "border-border bg-card"
