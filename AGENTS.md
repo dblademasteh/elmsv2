@@ -33,22 +33,31 @@ npm run dev          # then visit http://localhost:3000
 
 ## Seed Users
 
+Local development only — `scripts/init_db.py` creates these accounts when the
+database is empty and skips them when `ENVIRONMENT=production`.
+
 | Email | Password | Role |
 |-------|----------|------|
 | admin@lms.com | Admin123!@# | admin |
 | instructor@lms.com | Instructor123!@# | instructor |
 | student@lms.com | Student123!@# | student |
 
+Never reuse these credentials on a deployed environment: rotate or delete the
+seed accounts before exposing an instance, and keep the replacement passwords
+out of version control.
+
 ## Common Pitfalls
 
 ### Docker Compose
 - **Do NOT add `env_file: .env`** — the `.env` file has `localhost` URLs that fail inside containers. Environment variables are set inline in the compose file.
+- **Secrets must not be committed**: `SECRET_KEY` and `JWT_SECRET_KEY` come from the environment (`.env` locally, the deployment secret store in production) and compose fails fast when they are missing. Never put a literal key back into `docker-compose.yml` — a public repository with a known signing key lets anyone mint admin tokens.
 - All services **must share the `lms-network`** network for inter-container DNS resolution.
 - `init_db.py` runs on every container start and re-creates tables/seeds users (idempotent).
 - If `docker compose up` fails to build, run `docker compose build --no-cache`.
 
 ### Python / FastAPI
 - Pin `bcrypt>=3.2.0,<4.0.0` — passlib 1.7.x is incompatible with bcrypt 4.x.
+- `ENVIRONMENT` defaults to `production`. Set `ENVIRONMENT=development` (and `DEBUG_RESET_TOKEN=true` only if you need the password-reset token inline) locally — dev mode also relaxes CORS and allows the demo seed accounts.
 - `asyncpg` engine params: do NOT pass `pool_size`, `pool_pre_pinger`, or `pool_recycle` to `create_async_engine()` (PostgreSQL dialect rejects them).
 - Pydantic Settings: set `extra = "ignore"` to tolerate extra env vars.
 - `app/main.py` uses deprecated `@app.on_event` — acceptable for now, consider lifespan context manager for production.
@@ -119,9 +128,9 @@ npm run dev          # then visit http://localhost:3000
 Before deploying to production, complete the following:
 
 ### Security
-- [ ] Change `CORS allow_origins=["*"]` in `app/main.py:26` to specific frontend domain
-- [ ] Replace `JWT_SECRET_KEY` and `SECRET_KEY` in `.env` with strong random values (min 256 bits)
-- [ ] Set `ENVIRONMENT=production` to hide error details in `app/main.py:79`
+- [x] CORS origins come from `FRONTEND_URL` (no wildcard); dev-only origins require `ENVIRONMENT=development`
+- [x] Replace `JWT_SECRET_KEY` and `SECRET_KEY` in `.env` with strong random values (min 256 bits)
+- [x] `ENVIRONMENT` defaults to `production` to hide error details in `app/main.py:79`
 - [ ] Use HTTPS-only cookies and `Secure` flag in production
 - [ ] Add rate limiting on auth endpoints
 - [ ] Validate all inputs with Pydantic schemas (already in place)
@@ -132,7 +141,7 @@ Before deploying to production, complete the following:
 - [ ] Use secrets manager (AWS Secrets Manager, etc.) in production, not `.env`
 
 ### Docker / Deployment
-- [ ] Remove `--reload` flag from uvicorn command in Dockerfile and docker-compose.yml for production
+- [x] Remove `--reload` flag from uvicorn command in Dockerfile and docker-compose.yml for production
 - [ ] Use multi-stage Docker build to reduce image size
 - [ ] Pin base image digest (e.g., `python:3.11-slim@sha256:...`)
 - [ ] Run as non-root user in container

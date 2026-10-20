@@ -123,7 +123,7 @@ async def request_password_reset(body: PasswordResetRequest, db: get_db = Depend
             )
         )
         await db.commit()
-        if settings.ENVIRONMENT == "development":
+        if settings.ENVIRONMENT == "development" and settings.DEBUG_RESET_TOKEN:
             # No email service is configured; return the token inline in dev only.
             response["reset_token"] = token
     return response

@@ -32,7 +32,11 @@ class Settings(BaseSettings):
     
     # Frontend URL for CORS
     FRONTEND_URL: str = "http://localhost:3000"
-    ENVIRONMENT: str = "development"
+    # Secure by default: only an explicit ENVIRONMENT=development enables dev-only
+    # behaviour (seed credentials, inline password-reset tokens, relaxed CORS).
+    ENVIRONMENT: str = "production"
+    # Opt-in for returning password-reset tokens in the API response.
+    DEBUG_RESET_TOKEN: bool = False
 
     # File uploads (assignment submissions, etc.)
     UPLOAD_DIR: str = "uploads"
