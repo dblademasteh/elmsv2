@@ -93,6 +93,59 @@ def test_student_cannot_create_course(client, auth_headers):
     assert response.status_code == 403
 
 
+def test_lesson_publish_state_is_honoured(client, auth_headers):
+    """A lesson created as published has to be visible to enrolled students.
+
+    Students only ever see published lessons, so silently dropping the flag
+    on create leaves them with an empty course.
+    """
+    course = _create_course(client, auth_headers["instructor"], f"Published Lesson {uuid.uuid4().hex[:6]}")
+    course_id = course["id"]
+    _publish(client, auth_headers["instructor"], course_id)
+
+    created = client.post(
+        "/api/v1/courses/lessons",
+        headers=auth_headers["instructor"],
+        json={"course_id": course_id, "title": "Visible Lesson", "is_published": True},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["is_published"] is True
+
+    client.post("/api/v1/enrollments/", headers=auth_headers["student"], json={"course_id": course_id})
+
+    lessons = client.get(
+        f"/api/v1/courses/lessons/course/{course_id}", headers=auth_headers["student"]
+    )
+    assert lessons.status_code == 200
+    assert any(lesson["id"] == created.json()["id"] for lesson in lessons.json())
+
+    # A lesson created without the flag stays a draft and stays hidden.
+    draft = client.post(
+        "/api/v1/courses/lessons",
+        headers=auth_headers["instructor"],
+        json={"course_id": course_id, "title": "Draft Lesson"},
+    )
+    assert draft.status_code == 201
+    assert draft.json()["is_published"] is False
+
+    lessons = client.get(
+        f"/api/v1/courses/lessons/course/{course_id}", headers=auth_headers["student"]
+    )
+    assert all(lesson["id"] != draft.json()["id"] for lesson in lessons.json())
+
+    # Publishing it afterwards makes it visible.
+    publish = client.put(
+        f"/api/v1/courses/lessons/{draft.json()['id']}",
+        headers=auth_headers["instructor"],
+        json={"is_published": True},
+    )
+    assert publish.status_code == 200, publish.text
+    lessons = client.get(
+        f"/api/v1/courses/lessons/course/{course_id}", headers=auth_headers["student"]
+    )
+    assert any(lesson["id"] == draft.json()["id"] for lesson in lessons.json())
+
+
 def test_lesson_sections(client, auth_headers):
     course = _create_course(client, auth_headers["instructor"], f"Sections Course {uuid.uuid4().hex[:6]}")
     course_id = course["id"]

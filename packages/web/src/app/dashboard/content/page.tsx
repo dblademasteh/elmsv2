@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useAuthStore } from "@/store/auth"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { Button } from "@/components/ui/button"
 import { FileText, Loader2 } from "lucide-react"
 import { courseApi, lessonApi } from "@/lib/api"
 
@@ -30,6 +31,8 @@ export default function DashboardContentPage() {
   const [rows, setRows] = useState<ContentRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -80,6 +83,23 @@ export default function DashboardContentPage() {
     }
   }, [user])
 
+  async function togglePublish(row: ContentRow) {
+    setBusyId(row.lesson_id)
+    setActionError(null)
+    const next = !row.is_published
+    const response = await lessonApi.update(row.lesson_id, { is_published: next })
+    setBusyId(null)
+    if (response.error) {
+      setActionError(`Could not ${next ? "publish" : "unpublish"} “${row.title}”: ${response.error}`)
+      return
+    }
+    setRows((prev) =>
+      prev.map((r) =>
+        r.lesson_id === row.lesson_id ? { ...r, is_published: next } : r
+      )
+    )
+  }
+
   if (user?.role !== "admin" && user?.role !== "instructor") {
     return (
       <DashboardLayout>
@@ -110,6 +130,15 @@ export default function DashboardContentPage() {
             </p>
           )}
         </div>
+
+        {actionError && (
+          <div
+            role="alert"
+            className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            {actionError}
+          </div>
+        )}
 
         {loading ? (
           <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
@@ -175,15 +204,33 @@ export default function DashboardContentPage() {
                       {r.estimated_minutes > 0 ? `${r.estimated_minutes} min` : "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          r.is_published
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                        }`}
-                      >
-                        {r.is_published ? "Published" : "Draft"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            r.is_published
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                          }`}
+                        >
+                          {r.is_published ? "Published" : "Draft"}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          aria-label={`${r.is_published ? "Unpublish" : "Publish"} ${r.title}`}
+                          disabled={busyId === r.lesson_id}
+                          onClick={() => togglePublish(r)}
+                        >
+                          {busyId === r.lesson_id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                          ) : r.is_published ? (
+                            "Unpublish"
+                          ) : (
+                            "Publish"
+                          )}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

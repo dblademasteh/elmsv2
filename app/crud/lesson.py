@@ -35,8 +35,13 @@ async def create_lesson(
     content_json: str = None,
     estimated_minutes: int = 5,
     section_title: str = None,
+    is_published: bool = None,
 ) -> Lesson:
-    """Create a new lesson for a course."""
+    """Create a new lesson for a course.
+
+    Lessons start as a draft unless the caller explicitly asks for a published
+    one; students only ever see published lessons.
+    """
     db_lesson = Lesson(
         course_id=course_id,
         title=title,
@@ -49,7 +54,7 @@ async def create_lesson(
         content_json=content_json,
         estimated_minutes=estimated_minutes,
         section_title=section_title,
-        is_published=False,
+        is_published=bool(is_published) if is_published is not None else False,
     )
     db.add(db_lesson)
     await db.commit()

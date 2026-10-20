@@ -101,6 +101,7 @@ async def create_new_lesson(
         content_json=lesson_data.content_json,
         estimated_minutes=lesson_data.estimated_minutes,
         section_title=lesson_data.section_title,
+        is_published=lesson_data.is_published,
     )
 
     return LessonResponse(

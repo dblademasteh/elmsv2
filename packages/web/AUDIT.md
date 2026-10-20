@@ -18,9 +18,10 @@
 | B3 | Editing a course silently publishes it (H8) | **Fixed** — `app/dashboard/courses/page.tsx` |
 | B4 | `/dashboard/users` admits instructors (H7) | **Fixed** — `app/dashboard/users/page.tsx`, `components/layout/sidebar.tsx` |
 | B5 | Student course search is a no-op (H5) | **Fixed** — `app/dashboard/courses/page.tsx` |
+| B6 | A lesson can never be published — the Content page is read-only | **Fixed** — `app/dashboard/content/page.tsx`, `app/api/v1/endpoints/lessons.py`, `app/crud/lesson.py` (+ regression test) |
 | H1, H2, H3, H6, H9–H13, all P2/P3 | everything else | Open |
 
-Verification of the four fixes: ESLint unchanged (8 output lines = the 7 pre-existing warnings, 0 errors), `next build` compiles clean, backend suite `35 passed` (each new test fails with its fix stashed), and the Select/Toaster fixes were exercised with throwaway SSR and jsdom harnesses (selected label rendered, placeholder only when empty, no duplicate `id`, toast title/description in the DOM, toasts fired before the Toaster mounts are queued and flushed). B1 and B2 were additionally confirmed against the live stack (`docker compose up`): the enumeration attempt now scores 100 instead of 75, and a password change without/with the wrong current password is rejected with 400. The frontend still has no unit-test runner — `npm test` has no Jest config, `jest-environment-jsdom` or testing-library in `devDependencies`.
+Verification of the four fixes: ESLint unchanged (8 output lines = the 7 pre-existing warnings, 0 errors), `next build` compiles clean, backend suite `35 passed` (each new test fails with its fix stashed), and the Select/Toaster fixes were exercised with throwaway SSR and jsdom harnesses (selected label rendered, placeholder only when empty, no duplicate `id`, toast title/description in the DOM, toasts fired before the Toaster mounts are queued and flushed). B1 and B2 were additionally confirmed against the live stack (`docker compose up`): the enumeration attempt now scores 100 instead of 75, and a password change without/with the wrong current password is rejected with 400. B6 was confirmed the same way — a draft lesson becomes visible to a student only after an explicit publish, and disappears again when it is unpublished. The frontend still has no unit-test runner — `npm test` has no Jest config, `jest-environment-jsdom` or testing-library in `devDependencies`.
 
 ---
 
@@ -262,7 +263,7 @@ Backend (`app/api/v1/endpoints/courses.py:48-59`): with `mine=true` the instruct
 
 ## Bugs found after the audit (2026-10-20, live-stack probing)
 
-Driving the running stack with scripted API calls surfaced five defects the static read-through had ranked but not proven:
+Driving the running stack with scripted API calls surfaced six defects the static read-through had ranked but not proven:
 
 ### B1 · Enumeration answers are graded wrong (High, data integrity)
 `app/crud/quiz.py` compared the student's whole answer string against the pipe-split alternatives of the answer key. An instructor who keyed an enumeration question as the item list (`"2|3|5"`) got `accepted = ["2","3","5"]`, so a student who answered `"2, 3, 5"` (exactly what the UI asks for: *"List the items in order"*) was marked **wrong**. Live evidence: a 4-question quiz (MCQ, enumeration, identification, true/false) scored **75% instead of 100%** — only the enumeration question lost its points.
@@ -280,6 +281,10 @@ The page and the sidebar allowed `instructor`, but `GET /users/` and `PUT /users
 
 ### B5 · The student course search did nothing (Medium)
 The student branch of `dashboard/courses/page.tsx` computed `filtered` but rendered `courses`, so a search that matched nothing showed *"No courses available."* above the full list. **Fix:** the branch renders `filtered`, and the empty state distinguishes "no courses" from "no results".
+
+### B6 · A lesson could never be published (High, content delivery)
+`dashboard/content/page.tsx` rendered the Published/Draft badge as a read-only `<span>` with no control, and the API offered no way to flip the flag: `POST /courses/lessons` dropped `is_published` (the CRUD helper hard-coded `False`), and although `PUT /courses/lessons/{id}` accepted the field, nothing in the UI ever sent it. Every lesson was born a draft and stayed one, so `GET /courses/lessons/course/{id}` filtered it away for students (`app/api/v1/endpoints/lessons.py:46-47`) and lesson progress counted `0` published lessons forever (`app/crud/lesson_progress.py:31,39`). An instructor could not publish a course's content at all.
+**Fix:** `create_lesson` now honours an explicit `is_published` (still defaulting to a draft), `POST /courses/lessons` forwards the field, and the Content page has a per-row Publish/Unpublish button with a busy state and a visible error message on failure. Live evidence: a new lesson is a draft and invisible to a student; after publishing it appears in the student's lesson list and `published_at` is set; after unpublishing it disappears again while the instructor keeps seeing it.
 
 Checked and **not** bugs: role escalation through `PUT /users/me` (the role is ignored), students or instructors editing other accounts (403), unauthenticated writes (401 — an earlier 422 was body validation running first, not an auth bypass), and the student gradebook (it only ever returns the caller's own rows).
 
