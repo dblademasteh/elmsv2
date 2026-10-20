@@ -13,6 +13,7 @@ from app.core.quiz_types import (
     normalize_points,
     normalize_question_type,
     normalize_text,
+    split_answer_items,
 )
 from typing import Any, Dict, List, Optional
 import uuid
@@ -240,7 +241,15 @@ def _is_correct(q_type: str, student_answer: Any, correct: Any) -> bool:
     accepted = accepted_answers(correct)
     if not accepted:
         return False
-    return normalize_text(student_answer) in accepted
+    if normalize_text(student_answer) in accepted:
+        return True
+
+    # The answer key may list the items the student has to produce
+    # ("2|3|5"), so the same list written with another separator counts as
+    # well. The order is kept, matching the "list the items in order" prompt.
+    key_items = split_answer_items(correct)
+    student_items = split_answer_items(student_answer)
+    return bool(key_items) and key_items == student_items
 
 
 def _passing_grade(quiz: Quiz) -> float:

@@ -276,6 +276,55 @@ def test_enumeration_accepts_multiple_answers(client, auth_headers):
     assert response.json()["score"] == 100.0
 
 
+def test_enumeration_accepts_the_listed_items_in_any_separator(client, auth_headers):
+    """An enumeration key may list the items the student has to produce.
+
+    The student writes the list with whichever separator they reach for, so
+    the grader has to compare the items, not the raw string.
+    """
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+    questions = [
+        {
+            "id": "q_list",
+            "type": "enumeration",
+            "question": "List the first three prime numbers",
+            "correct_answer": "2|3|5",
+            "points": 5,
+        }
+    ]
+    quiz = _create_quiz(
+        client,
+        auth_headers["instructor"],
+        lesson["id"],
+        questions,
+        max_attempts=20,
+        allow_retry=True,
+    )
+    _enroll(client, auth_headers["student"], course["id"])
+
+    for answer in ("2, 3, 5", "2|3|5", "2;3;5", " 2 , 3 , 5 "):
+        response = _submit(
+            client,
+            auth_headers["student"],
+            quiz["id"],
+            [{"question_id": "q_list", "answer": answer}],
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["score"] == 100.0, f"answer {answer!r} was graded wrong"
+
+    # A wrong list, a missing item and the wrong order are still wrong.
+    for answer in ("2, 3", "2, 5, 3", "4, 6, 8"):
+        response = _submit(
+            client,
+            auth_headers["student"],
+            quiz["id"],
+            [{"question_id": "q_list", "answer": answer}],
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["score"] == 0.0, f"answer {answer!r} was graded correct"
+
+
 def test_essay_attempt_awaits_instructor_review(client, auth_headers):
     course = _create_course(client, auth_headers["instructor"])
     lesson = _create_lesson(client, auth_headers["instructor"], course["id"])

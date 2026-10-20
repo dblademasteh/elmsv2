@@ -5,6 +5,7 @@ authoring, delivery and grading never disagree about what a question type
 means.
 """
 from typing import Any, Dict, Iterable, List, Optional, Sequence
+import re
 
 MULTIPLE_CHOICE = "multiple_choice"
 ENUMERATION = "enumeration"
@@ -93,6 +94,27 @@ def accepted_answers(correct: Any) -> List[str]:
             if normalized and normalized not in accepted:
                 accepted.append(normalized)
     return accepted
+
+
+def split_answer_items(value: Any) -> List[str]:
+    """Split a free-text answer into the items it lists.
+
+    Students separate the items of an enumeration answer with whatever
+    separator they reach for first (',', ';', '|' or a newline), so the
+    comparison has to be independent of the separator used.
+    """
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        raw_items = [str(item) for item in value]
+    else:
+        raw_items = re.split(r"[|;,\n\r]+", str(value))
+    items: List[str] = []
+    for item in raw_items:
+        normalized = normalize_text(item)
+        if normalized and normalized not in items:
+            items.append(normalized)
+    return items
 
 
 def normalize_questions(questions: Optional[Iterable[Any]]) -> List[Dict[str, Any]]:
