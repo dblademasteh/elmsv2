@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ClipboardList, ExternalLink, FileCheck, Loader2, Plus, Search } from "lucide-react"
 import { formatDateTime, formatDuration } from "@/lib/format"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "@/components/ui/use-toast"
 
 const createExamSchema = z.object({
   course_id: z.string().min(1, "Select a course"),
@@ -54,7 +54,6 @@ export default function ExamsPage() {
   const { user } = useAuthStore()
   const role = user?.role
   const isManager = role === "admin" || role === "instructor"
-  const { toast } = useToast()
 
   const [exams, setExams] = useState<QuizRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -186,7 +185,7 @@ export default function ExamsPage() {
       }
       setLoading(false)
     }
-  }, [user, isManager, toast])
+  }, [user, isManager])
 
   useEffect(() => {
     load()

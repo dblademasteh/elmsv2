@@ -294,7 +294,7 @@ export default function StudentAssignmentsPage() {
                     </div>
                   )}
 
-                  {(a.submission?.status === "draft" || a.submission?.status === "graded") && a.isPublished && (
+                  {(!a.submission || a.submission.status === "draft" || a.submission.status === "graded") && a.isPublished && (
                     <Button size="sm" onClick={() => handleSubmit(a)}>
                       <Upload className="h-4 w-4 mr-1" />
                       {a.submission?.status === "graded" ? "Resubmit" : "Submit Assignment"}

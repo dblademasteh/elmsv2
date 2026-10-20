@@ -72,9 +72,22 @@ interface State {
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 let currentDispatch: ((action: Action) => void) | null = null
+const pendingActions: Action[] = []
 
 function setDispatch(dispatch: (action: Action) => void) {
   currentDispatch = dispatch
+  if (pendingActions.length) {
+    const queued = pendingActions.splice(0, pendingActions.length)
+    queued.forEach((action) => dispatch(action))
+  }
+}
+
+function dispatchAction(action: Action) {
+  if (currentDispatch) {
+    currentDispatch(action)
+  } else {
+    pendingActions.push(action)
+  }
 }
 
 const addToRemoveQueue = (toastId: string) => {
@@ -84,7 +97,7 @@ const addToRemoveQueue = (toastId: string) => {
 
   const timeout = setTimeout(() => {
     toastTimeouts.delete(toastId)
-    currentDispatch?.({
+    dispatchAction({
       type: "REMOVE_TOAST",
       toastId: toastId,
     })
@@ -156,17 +169,15 @@ type ToastInput = Omit<ToasterToast, "id"> & {
 
 function toast({ ...props }: ToastInput) {
   const id = genId()
-  const dispatch = currentDispatch
-  if (!dispatch) return { id: id, dismiss: () => {}, update: () => {} }
 
   const update = (props: Partial<ToasterToast>) =>
-    dispatch({
+    dispatchAction({
       type: "UPDATE_TOAST",
       toast: { ...props, id },
     })
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
+  const dismiss = () => dispatchAction({ type: "DISMISS_TOAST", toastId: id })
 
-  dispatch({
+  dispatchAction({
     type: "ADD_TOAST",
     toast: {
       ...props,
