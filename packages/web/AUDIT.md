@@ -13,9 +13,14 @@
 | C2 | Students can never submit an assignment | **Fixed** — `app/dashboard/assignments/page.tsx` |
 | C3 | `Select` never shows the selected value | **Fixed** — `components/ui/select.tsx` |
 | C4 | Admin's own draft courses are invisible | **Fixed** — `app/api/v1/endpoints/courses.py`, `app/crud/course.py` (+ regression test) |
-| H1–H13, P2, P3 | everything else | Open |
+| B1 | Enumeration answers are graded wrong (found after the audit) | **Fixed** — `app/core/quiz_types.py`, `app/crud/quiz.py` (+ regression test) |
+| B2 | Password change never verifies the current password (found after the audit) | **Fixed** — `app/schemas/user.py`, `app/api/v1/endpoints/users.py`, `app/profile/page.tsx` (+ regression test) |
+| B3 | Editing a course silently publishes it (H8) | **Fixed** — `app/dashboard/courses/page.tsx` |
+| B4 | `/dashboard/users` admits instructors (H7) | **Fixed** — `app/dashboard/users/page.tsx`, `components/layout/sidebar.tsx` |
+| B5 | Student course search is a no-op (H5) | **Fixed** — `app/dashboard/courses/page.tsx` |
+| H1, H2, H3, H6, H9–H13, all P2/P3 | everything else | Open |
 
-Verification of the four fixes: ESLint unchanged (8 output lines = the 7 pre-existing warnings, 0 errors), `next build` compiles clean, backend suite `33 passed` (new test `test_admin_mine_list_includes_own_drafts` fails without the C4 fix), and the Select/Toaster fixes were exercised with throwaway SSR and jsdom harnesses (selected label rendered, placeholder only when empty, no duplicate `id`, toast title/description in the DOM, toasts fired before the Toaster mounts are queued and flushed). The frontend still has no unit-test runner — `npm test` has no Jest config, `jest-environment-jsdom` or testing-library in `devDependencies`.
+Verification of the four fixes: ESLint unchanged (8 output lines = the 7 pre-existing warnings, 0 errors), `next build` compiles clean, backend suite `35 passed` (each new test fails with its fix stashed), and the Select/Toaster fixes were exercised with throwaway SSR and jsdom harnesses (selected label rendered, placeholder only when empty, no duplicate `id`, toast title/description in the DOM, toasts fired before the Toaster mounts are queued and flushed). B1 and B2 were additionally confirmed against the live stack (`docker compose up`): the enumeration attempt now scores 100 instead of 75, and a password change without/with the wrong current password is rejected with 400. The frontend still has no unit-test runner — `npm test` has no Jest config, `jest-environment-jsdom` or testing-library in `devDependencies`.
 
 ---
 
@@ -255,7 +260,34 @@ Backend (`app/api/v1/endpoints/courses.py:48-59`): with `mine=true` the instruct
 
 ---
 
+## Bugs found after the audit (2026-10-20, live-stack probing)
+
+Driving the running stack with scripted API calls surfaced five defects the static read-through had ranked but not proven:
+
+### B1 · Enumeration answers are graded wrong (High, data integrity)
+`app/crud/quiz.py` compared the student's whole answer string against the pipe-split alternatives of the answer key. An instructor who keyed an enumeration question as the item list (`"2|3|5"`) got `accepted = ["2","3","5"]`, so a student who answered `"2, 3, 5"` (exactly what the UI asks for: *"List the items in order"*) was marked **wrong**. Live evidence: a 4-question quiz (MCQ, enumeration, identification, true/false) scored **75% instead of 100%** — only the enumeration question lost its points.
+**Fix:** `split_answer_items()` (`app/core/quiz_types.py`) splits a free-text answer on `|`, `;`, `,` and newlines, and the grader now also accepts an item list that matches the key's items in order. The existing "alternatives" semantics (`"Paris | Paris, France"`) still hold, so `test_enumeration_accepts_multiple_answers` keeps passing. The UI hints now spell the format out for both sides.
+
+### B2 · A password change never verified the current password (High, security)
+`PUT /users/me` hashed and applied the new password straight from the request; `UserUpdate` had no `current_password` field, and `profile/page.tsx` collected the field but dropped it before sending. Anyone holding a valid JWT could rotate the account password. The profile form's "Current password" input was decorative.
+**Fix:** `current_password` is now part of `UserUpdate`, the endpoint rejects a missing or wrong current password with 400, and the client sends the value it already collects. The token-based reset flow is unaffected.
+
+### B3 · Editing a course published it (Medium)
+`dashboard/courses/page.tsx` always sent `is_private: false` (the field had no control in the form), and `app/crud/course.py:184` applies any non-`None` value — so every save flipped a private course to public. **Fix:** the payload no longer carries `is_private`, so the API keeps the stored value.
+
+### B4 · `/dashboard/users` admitted instructors (Medium)
+The page and the sidebar allowed `instructor`, but `GET /users/` and `PUT /users/{id}` are admin-only (`app/api/v1/endpoints/users.py:104-111`), so an instructor got a permanent 403 behind a full table UI. **Fix:** the page and the nav item are admin-only now.
+
+### B5 · The student course search did nothing (Medium)
+The student branch of `dashboard/courses/page.tsx` computed `filtered` but rendered `courses`, so a search that matched nothing showed *"No courses available."* above the full list. **Fix:** the branch renders `filtered`, and the empty state distinguishes "no courses" from "no results".
+
+Checked and **not** bugs: role escalation through `PUT /users/me` (the role is ignored), students or instructors editing other accounts (403), unauthenticated writes (401 — an earlier 422 was body validation running first, not an auth bypass), and the student gradebook (it only ever returns the caller's own rows).
+
+---
+
 ## Appendix A — ESLint output (7 warnings, 0 errors)
+---
+
 
 ```
 src/app/courses/[id]/learn/page.tsx:193          missing deps: isAuthenticated, router (complex expression)
