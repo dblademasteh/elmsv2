@@ -3,7 +3,7 @@
 **Date:** 2026-10-20 · **Stack:** Next.js 14 (App Router) + React 18 + Tailwind + Radix · **Scope:** all 51 `.tsx` / 7 `.ts` files under `src/`
 **Method:** 4 parallel deep-read audits (quiz/exam area, public pages + data layer, dashboard pages, UI primitives + app shell), each finding independently re-verified against the source and the FastAPI backend before inclusion. ESLint run via Docker (`node` is not installed on the host).
 
-**Totals: 4 Critical · 13 High · 25 Medium · 22 Low · 7 lint warnings (64 findings)**
+**Totals: 4 Critical · 13 High · 25 Medium · 22 Low · 8 lint warnings (64 findings)**
 
 ## Status
 
@@ -27,9 +27,10 @@
 | H3 | The seed credentials are shipped in the client bundle | **Fixed** — `app/core/demo_accounts.py`, `app/api/v1/endpoints/auth.py`, `app/login/page.tsx` (+ regression test) |
 | H11 | Due dates are shifted by the UTC/local mismatch | **Fixed** — `lib/format.ts`, `app/dashboard/courses/[courseId]/assignments/page.tsx` |
 | H13 | Native `alert()` / `confirm()` instead of the toast system | **Fixed** — `store/confirm.ts`, `components/ui/confirm-dialog.tsx` + 8 pages |
-| H12, all P2/P3 | everything else | Open |
+| H12 | API client: no timeout, no abort, and 307 redirects on every collection call | **Fixed** — `lib/api.ts` (+ 39 frontend unit tests) |
+| all P2/P3 | everything else | Open |
 
-Verification of the four fixes: ESLint unchanged (8 output lines = the 7 pre-existing warnings, 0 errors), `next build` compiles clean, backend suite `35 passed` (each new test fails with its fix stashed), and the Select/Toaster fixes were exercised with throwaway SSR and jsdom harnesses (selected label rendered, placeholder only when empty, no duplicate `id`, toast title/description in the DOM, toasts fired before the Toaster mounts are queued and flushed). B1 and B2 were additionally confirmed against the live stack (`docker compose up`): the enumeration attempt now scores 100 instead of 75, and a password change without/with the wrong current password is rejected with 400. B6 was confirmed the same way — a draft lesson becomes visible to a student only after an explicit publish, and disappears again when it is unpublished. H6 was confirmed the same way: `javascript:`, `data:`, `file:`, `//host/x` and `ftp:` submissions are all rejected with 422, while `https://example.com/work.zip` is accepted, stored and shown to the instructor. The backend suite is now `39 passed`. H3 was confirmed against the built bundle: `grep -r 'Admin123!@#' .next/` finds nothing, while `GET /auth/demo-accounts` answers 200 in development and 404 once `ENVIRONMENT=production`. The frontend still has no unit-test runner — `npm test` has no Jest config, `jest-environment-jsdom` or testing-library in `devDependencies`.
+Verification of the four fixes: ESLint unchanged (8 output lines = the 7 pre-existing warnings, 0 errors), `next build` compiles clean, backend suite `35 passed` (each new test fails with its fix stashed), and the Select/Toaster fixes were exercised with throwaway SSR and jsdom harnesses (selected label rendered, placeholder only when empty, no duplicate `id`, toast title/description in the DOM, toasts fired before the Toaster mounts are queued and flushed). B1 and B2 were additionally confirmed against the live stack (`docker compose up`): the enumeration attempt now scores 100 instead of 75, and a password change without/with the wrong current password is rejected with 400. B6 was confirmed the same way — a draft lesson becomes visible to a student only after an explicit publish, and disappears again when it is unpublished. H6 was confirmed the same way: `javascript:`, `data:`, `file:`, `//host/x` and `ftp:` submissions are all rejected with 422, while `https://example.com/work.zip` is accepted, stored and shown to the instructor. H12 was confirmed the same way: `GET /api/v1/courses?limit=1` answers 307, `GET /api/v1/courses/?limit=1` answers 200. The backend suite is now `39 passed`. H3 was confirmed against the built bundle: `grep -r 'Admin123!@#' .next/` finds nothing, while `GET /auth/demo-accounts` answers 200 in development and 404 once `ENVIRONMENT=production`. The frontend now has a unit-test runner: `jest.config.js` (via `next/jest`, node environment) runs `src/**/*.test.ts` — **39 tests** covering the URL allow-list, the date/time conversion and the API client's normalisation, timeout and cancellation. Component tests would still need `jest-environment-jsdom` and testing-library, neither of which is installed.
 
 ---
 
@@ -199,7 +200,7 @@ Backend (`app/api/v1/endpoints/courses.py:48-59`): with `mine=true` the instruct
 
 ### H12 · API client: no timeout, no abort, and 307 redirects on every collection call
 **`src/lib/api.ts:57, :73-75, :126, :134-139`** — `fetch` is issued with no `AbortController` and no timeout (a stalled backend hangs the request forever); endpoints are built without trailing-slash normalisation while the backend redirects `/courses` → `/courses/` (307), costing an extra round trip per list call and risking header/credential semantics.
-**Fix:** add a default `AbortController` timeout to `request()`/`upload()` (return `{ error: "Request timed out" }` on `AbortError`), normalise collection URLs, and expose an abort handle for components.
+**Fix (done):** every request now runs through an `AbortController` with a 20 s default timeout, and a caller can pass its own `signal` to cancel a request (both `request()` and `upload()` report `"Request timed out"` and `"Request cancelled"` instead of the generic "Network error"). The collection routes the API registers with a trailing slash (`/courses`, `/users`, `/enrollments`, `/notifications`, `/announcements`) are normalised in one place, so no call site has to remember the slash. Live evidence: `GET /api/v1/courses?limit=1` answers **307**, `GET /api/v1/courses/?limit=1` answers **200** — the client now asks for the second one.
 
 ### H13 · Native `alert()` / `confirm()` instead of the toast system
 12 call sites across 8 files: `src/app/dashboard/courses/[courseId]/quizzes/page.tsx:118,198,244`; `src/app/dashboard/assignments/page.tsx:210`; `src/app/dashboard/notifications/page.tsx:158`; `src/app/dashboard/courses/page.tsx:179`; `src/app/dashboard/courses/[courseId]/assignments/page.tsx:163,189,236`; `src/app/components/discussions/course-discussions.tsx:108,116`; `src/app/courses/[id]/page.tsx:438`; `src/app/courses/[id]/learn/page.tsx:226`. They block the main thread, ignore the theme, and are inconsistent with the `role="alert"` / `setFormError` pattern already used in `courses/page.tsx:485-489`.
@@ -298,18 +299,20 @@ Checked and **not** bugs: role escalation through `PUT /users/me` (the role is i
 
 ---
 
-## Appendix A — ESLint output (7 warnings, 0 errors)
+## Appendix A — ESLint output (8 warnings, 0 errors)
 ---
 
 
 ```
-src/app/courses/[id]/learn/page.tsx:193          missing deps: isAuthenticated, router (complex expression)
-src/app/dashboard/courses/[courseId]/assignments/page.tsx:114   missing dep: loadData
-src/app/dashboard/courses/[courseId]/quizzes/page.tsx:71        missing dep: loadData
+src/app/courses/[id]/learn/page.tsx:194          missing deps: isAuthenticated, router (complex expression)
+src/app/dashboard/courses/[courseId]/assignments/page.tsx:157   missing dep: loadData
+src/app/dashboard/courses/[courseId]/quizzes/page.tsx:73        missing dep: loadData
 src/app/dashboard/students/page.tsx:61          <img> instead of next/image
-src/app/profile/page.tsx:147,160                aria-selected not supported on role="button"
+src/app/profile/page.tsx:148,161                aria-selected not supported on role="button"
 src/components/quizzes/attempt-review.tsx:58    missing dep: loadAttempts
 ```
+
+(The `learn/page.tsx` line reports two warnings — a missing dependency and a complex dependency expression — so the six locations above are eight warnings.)
 
 Reproduce (the host has no node/npm, so the lint runs in the image):
 ```bash
@@ -333,4 +336,4 @@ The three `exhaustive-deps` findings are the same class of bug as H1/H10 (stale 
 ### Suggested fix order
 `C1 → C2 → C3 → C4` (each is small and self-contained) → `H1, H2, H3, H4` (correctness/security) → `H5-H12` → shared loader + primitive cleanups → P3 sweep.
 
-Done so far: `C1–C4`, `H1`, `H4` (via B2), `H5` (via B5), `H6`, `H7` (via B4), `H8` (via B3), `H9`, `H10`, `H11`, `H13`, plus `B1`–`B6`. Still open: `H12` and the P2/P3 lists.
+Done so far: `C1–C4`, `H1`–`H13` (every High finding), plus `B1`–`B6`. Still open: the P2/P3 lists.

@@ -3,10 +3,41 @@ import { useAuthStore } from '@/store/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
+/** How long a request may take before it is aborted. */
+const DEFAULT_TIMEOUT_MS = 20_000;
+
+/**
+ * Collection routes the API registers with a trailing slash.
+ *
+ * Without the slash FastAPI answers with a 307 redirect, which costs an
+ * extra round trip per list call and risks dropping the Authorization
+ * header. Normalising here keeps every call site free of the detail.
+ */
+const COLLECTION_PATHS = new Set([
+  '/announcements',
+  '/courses',
+  '/enrollments',
+  '/notifications',
+  '/users',
+]);
+
 interface ApiResponse<T> {
   data?: T;
   message?: string;
   error?: string;
+}
+
+/** Per-request options; `timeoutMs` overrides the default timeout. */
+export interface RequestOptions extends RequestInit {
+  timeoutMs?: number;
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { name?: string }).name === 'AbortError'
+  );
 }
 
 class ApiClient {
@@ -15,6 +46,56 @@ class ApiClient {
 
   constructor(baseUrl: string = API_URL) {
     this.baseUrl = baseUrl;
+  }
+
+  /** Add the trailing slash the API expects on collection routes. */
+  private normalize(endpoint: string): string {
+    const queryAt = endpoint.indexOf('?');
+    const path = queryAt === -1 ? endpoint : endpoint.slice(0, queryAt);
+    const query = queryAt === -1 ? '' : endpoint.slice(queryAt);
+
+    const withoutSlash = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
+    if (COLLECTION_PATHS.has(withoutSlash)) {
+      return `${withoutSlash}/${query}`;
+    }
+    return endpoint;
+  }
+
+  /**
+   * Wire a request up to a timeout and to the caller's abort signal.
+   *
+   * Returns the controller to use and a `timedOut` flag that tells a
+   * timeout apart from a cancellation.
+   */
+  private beginAbort(
+    externalSignal: AbortSignal | null | undefined,
+    timeoutMs: number
+  ): { controller: AbortController; timedOut: () => boolean; done: () => void } {
+    const controller = new AbortController();
+    let timedOut = false;
+
+    const onExternalAbort = () => controller.abort();
+    if (externalSignal) {
+      if (externalSignal.aborted) controller.abort();
+      else externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+
+    const timer =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+          }, timeoutMs)
+        : null;
+
+    return {
+      controller,
+      timedOut: () => timedOut,
+      done: () => {
+        if (timer) clearTimeout(timer);
+        externalSignal?.removeEventListener('abort', onExternalAbort);
+      },
+    };
   }
 
   /**
@@ -51,33 +132,38 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {},
+    options: RequestOptions = {},
     isRetry = false
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}${endpoint}`;
+    const { timeoutMs = DEFAULT_TIMEOUT_MS, ...init } = options;
+    const path = this.normalize(endpoint);
+    const url = `${this.baseUrl}${path}`;
 
-    const headers = new Headers(options.headers);
+    const headers = new Headers(init.headers);
     headers.set('Content-Type', 'application/json');
     const token = useAuthStore.getState().token;
-    if (token && !endpoint.startsWith('/auth/') && !headers.has('Authorization')) {
+    if (token && !path.startsWith('/auth/') && !headers.has('Authorization')) {
       headers.set('Authorization', `Bearer ${token}`);
     }
 
+    const { controller, timedOut, done } = this.beginAbort(init.signal, timeoutMs);
+
     // Include credentials for cookies
     const config: RequestInit = {
-      ...options,
+      ...init,
       headers,
       credentials: 'include',
+      signal: controller.signal,
     };
 
     try {
       const response = await fetch(url, config);
 
-      if (response.status === 401 && !isRetry && !endpoint.startsWith('/auth/')) {
+      if (response.status === 401 && !isRetry && !path.startsWith('/auth/')) {
         // Access token may have expired - try one silent refresh, then retry
         const newToken = await this.refreshTokens();
         if (newToken) {
-          return this.request<T>(endpoint, options, true);
+          return this.request<T>(path, options, true);
         }
       }
 
@@ -91,44 +177,55 @@ class ApiClient {
       const data = await response.json();
       return { data };
     } catch (error) {
+      if (timedOut()) return { error: 'Request timed out' };
+      if (isAbortError(error)) return { error: 'Request cancelled' };
       return { error: 'Network error' };
+    } finally {
+      done();
     }
   }
 
-  get<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  get<T>(endpoint: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: "GET", ...options });
   }
 
-  post<T>(endpoint: string, body: unknown): Promise<ApiResponse<T>> {
+  post<T>(endpoint: string, body: unknown, options: RequestOptions = {}): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: JSON.stringify(body),
+      ...options,
     });
   }
 
-  put<T>(endpoint: string, body: unknown): Promise<ApiResponse<T>> {
+  put<T>(endpoint: string, body: unknown, options: RequestOptions = {}): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'PUT',
       body: JSON.stringify(body),
+      ...options,
     });
   }
 
-  delete<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
+  delete<T>(endpoint: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: 'DELETE', ...options });
   }
 
   /** Multipart file upload (bypasses the JSON content-type of `request`). */
   async upload<T>(
     endpoint: string,
     formData: FormData,
-    isRetry = false
+    isRetry = false,
+    options: RequestOptions = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}${endpoint}`;
+    const { timeoutMs = DEFAULT_TIMEOUT_MS, ...init } = options;
+    const path = this.normalize(endpoint);
+    const url = `${this.baseUrl}${path}`;
     const headers = new Headers();
     const token = useAuthStore.getState().token;
     if (token && !headers.has('Authorization')) {
       headers.set('Authorization', `Bearer ${token}`);
     }
+
+    const { controller, timedOut, done } = this.beginAbort(init.signal, timeoutMs);
 
     try {
       const response = await fetch(url, {
@@ -136,12 +233,13 @@ class ApiClient {
         headers,
         credentials: 'include',
         body: formData,
+        signal: controller.signal,
       });
 
       if (response.status === 401 && !isRetry) {
         const newToken = await this.refreshTokens();
         if (newToken) {
-          return this.upload<T>(endpoint, formData, true);
+          return this.upload<T>(path, formData, true, options);
         }
       }
 
@@ -152,8 +250,12 @@ class ApiClient {
 
       const data = await response.json();
       return { data };
-    } catch {
+    } catch (error) {
+      if (timedOut()) return { error: 'Request timed out' };
+      if (isAbortError(error)) return { error: 'Request cancelled' };
       return { error: 'Network error' };
+    } finally {
+      done();
     }
   }
 }

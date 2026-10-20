@@ -69,6 +69,8 @@ out of version control.
 - Components using React hooks (`useAuthStore`, `useForm`, etc.) **must have `'use client';`** at the top (Next.js App Router requirement).
 - Login page: `/login` renders the form; the API endpoint is `POST /api/v1/auth/login`.
 - `next.config.js` sets `NEXT_PUBLIC_API_URL` via `env` — update for production deployments.
+- `npm test` runs Jest (`jest.config.js`, node environment) over `src/**/*.test.ts` — pure logic only; component tests would need `jest-environment-jsdom` and testing-library.
+- The API client normalises the collection routes that the backend registers with a trailing slash (`/courses/`, `/users/`, `/enrollments/`, `/notifications/`, `/announcements/`) — without it FastAPI answers 307.
 
 ### Dependency quirks (already fixed in package.json)
 - `@radix-ui/react-slot`: use 1.1.2 (1.0.4 does not exist on npm).
