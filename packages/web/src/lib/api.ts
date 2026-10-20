@@ -193,6 +193,15 @@ export const authApi = {
 
   resetPassword: (token: string, new_password: string) =>
     api.post<{ message: string }>('/auth/reset-password/confirm', { token, new_password }),
+
+  /**
+   * The seeded demo accounts, for the login page's "quick access" panel.
+   *
+   * The endpoint only answers in development, so the credentials never
+   * reach a deployed instance and are never part of this bundle.
+   */
+  demoAccounts: () =>
+    api.get<Array<{ role: string; email: string; password: string }>>('/auth/demo-accounts'),
 };
 
 // User management endpoints (admin only)

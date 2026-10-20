@@ -16,6 +16,7 @@ from app.models.course import Course
 from app.models.lesson import Lesson
 from app.models.quiz import Quiz, QuizAttempt
 from app.core.security import get_password_hash
+from app.core.demo_accounts import DEMO_ADMIN, DEMO_INSTRUCTOR, DEMO_STUDENT
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -89,72 +90,72 @@ async def init_db():
         # Seed admin user
         admin = await database.fetch_one(
             "SELECT id FROM users WHERE email = :email",
-            {"email": "admin@lms.com"}
+            {"email": DEMO_ADMIN["email"]}
         )
-        
+
         if not admin:
-            admin_password_hash = get_password_hash("Admin123!@#")
+            admin_password_hash = get_password_hash(DEMO_ADMIN["password"])
             query = """
                 INSERT INTO users (id, email, full_name, hashed_password, role, is_active)
                 VALUES (:id, :email, :full_name, :hashed_password, :role, :is_active)
             """
             await database.execute(query, {
                 "id": str(uuid.uuid4()),
-                "email": "admin@lms.com",
-                "full_name": "Admin User",
+                "email": DEMO_ADMIN["email"],
+                "full_name": DEMO_ADMIN["full_name"],
                 "hashed_password": admin_password_hash,
-                "role": "admin",
+                "role": DEMO_ADMIN["role"],
                 "is_active": True
             })
-            logger.info("✅ Admin: admin@lms.com / Admin123!@#")
+            logger.info(f"✅ Admin: {DEMO_ADMIN['email']} / {DEMO_ADMIN['password']}")
 
         if os.getenv("ENVIRONMENT") == "production":
             logger.info("Production startup: skipping demo seed data")
             return
-        
+
         # Seed instructor
         instructor = await database.fetch_one(
             "SELECT id FROM users WHERE email = :email",
-            {"email": "instructor@lms.com"}
+            {"email": DEMO_INSTRUCTOR["email"]}
         )
-        
+
         if not instructor:
-            instructor_password_hash = get_password_hash("Instructor123!@#")
+            instructor_password_hash = get_password_hash(DEMO_INSTRUCTOR["password"])
             query = """
                 INSERT INTO users (id, email, full_name, hashed_password, role, is_active)
                 VALUES (:id, :email, :full_name, :hashed_password, :role, :is_active)
             """
             await database.execute(query, {
                 "id": str(uuid.uuid4()),
-                "email": "instructor@lms.com",
-                "full_name": "Instructor User",
+                "email": DEMO_INSTRUCTOR["email"],
+                "full_name": DEMO_INSTRUCTOR["full_name"],
                 "hashed_password": instructor_password_hash,
-                "role": "instructor",
+                "role": DEMO_INSTRUCTOR["role"],
                 "is_active": True
             })
-            logger.info("✅ Instructor: instructor@lms.com / Instructor123!@#")
-        
+            logger.info(f"✅ Instructor: {DEMO_INSTRUCTOR['email']} / {DEMO_INSTRUCTOR['password']}")
+
         # Seed student
         student = await database.fetch_one(
             "SELECT id FROM users WHERE email = :email",
-            {"email": "student@lms.com"}
+            {"email": DEMO_STUDENT["email"]}
         )
-        
+
         if not student:
-            student_password_hash = get_password_hash("Student123!@#")
+            student_password_hash = get_password_hash(DEMO_STUDENT["password"])
             query = """
                 INSERT INTO users (id, email, full_name, hashed_password, role, is_active)
                 VALUES (:id, :email, :full_name, :hashed_password, :role, :is_active)
             """
             await database.execute(query, {
                 "id": str(uuid.uuid4()),
-                "email": "student@lms.com",
-                "full_name": "Student User",
+                "email": DEMO_STUDENT["email"],
+                "full_name": DEMO_STUDENT["full_name"],
                 "hashed_password": student_password_hash,
-                "role": "student",
+                "role": DEMO_STUDENT["role"],
                 "is_active": True
             })
-            logger.info("✅ Student: student@lms.com / Student123!@#")
+            logger.info(f"✅ Student: {DEMO_STUDENT['email']} / {DEMO_STUDENT['password']}")
         
         # Seed sample courses
         course_count = await database.fetch_one("SELECT COUNT(*) as count FROM courses")

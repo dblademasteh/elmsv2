@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { BookOpen, Loader2, Pencil, Plus, Rocket, Archive, Search } from "lucide-react"
+import { confirmAction } from "@/store/confirm"
 
 type ManagedCourse = {
   id: string
@@ -174,9 +175,13 @@ export default function DashboardCoursesPage() {
   }
 
   async function handleArchive(course: ManagedCourse) {
-    if (!window.confirm(`Archive "${course.title}"? It will be hidden from the catalog.`)) {
-      return
-    }
+    const confirmed = await confirmAction({
+      title: `Archive "${course.title}"?`,
+      description: "It will be hidden from the catalog.",
+      confirmLabel: "Archive",
+      destructive: true,
+    })
+    if (!confirmed) return
     setBusyId(course.id)
     setActionError(null)
     const response = await courseApi.archive(course.id)

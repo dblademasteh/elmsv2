@@ -14,6 +14,7 @@ from app.schemas.user import UserResponse
 from app.core import security
 from app.core.security import get_password_hash
 from app.core.config import settings
+from app.core.demo_accounts import DEMO_ACCOUNTS
 from app.db.database import get_db
 from app.crud.user import get_user_by_email, get_user_by_id, create_user
 from app.models.password_reset import PasswordResetToken
@@ -51,6 +52,19 @@ async def register(user_in: RegisterRequest, db: get_db = Depends()):
         is_active=new_user.is_active,
         created_at=new_user.created_at
     )
+
+@router.get("/demo-accounts")
+async def demo_accounts():
+    """The seeded demo accounts, for the login page's "quick access" panel.
+
+    Development only: outside ``ENVIRONMENT=development`` the endpoint
+    answers 404, so the credentials are never served by a deployment and
+    never have to be shipped in the web client's bundle.
+    """
+    if settings.ENVIRONMENT != "development":
+        raise HTTPException(status_code=404, detail="Not found")
+    return DEMO_ACCOUNTS
+
 
 @router.post("/login", response_model=Token)
 async def login(form_data: LoginRequest, db: get_db = Depends()):

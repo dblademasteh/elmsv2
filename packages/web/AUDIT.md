@@ -23,9 +23,13 @@
 | H6 | A student-controlled URL is rendered as a trusted link for instructors | **Fixed** — `app/core/urls.py`, `app/schemas/assignment.py`, `lib/urls.ts` (+ regression tests) |
 | H9 | Notifications are not navigable | **Fixed** — `app/dashboard/notifications/page.tsx` |
 | H10 | Mutations are applied locally even when the API rejects them | **Fixed** — `app/dashboard/courses/[courseId]/assignments/page.tsx`, `app/dashboard/courses/[courseId]/quizzes/page.tsx`, `app/dashboard/notifications/page.tsx`, `app/dashboard/users/page.tsx` |
-| H2, H3, H11–H13, all P2/P3 | everything else | Open |
+| H2 | The forgot-password flow cannot be completed in production | **Fixed** — `app/forgot-password/page.tsx`, `app/forgot-password/reset/page.tsx`, `components/auth/reset-password-form.tsx` |
+| H3 | The seed credentials are shipped in the client bundle | **Fixed** — `app/core/demo_accounts.py`, `app/api/v1/endpoints/auth.py`, `app/login/page.tsx` (+ regression test) |
+| H11 | Due dates are shifted by the UTC/local mismatch | **Fixed** — `lib/format.ts`, `app/dashboard/courses/[courseId]/assignments/page.tsx` |
+| H13 | Native `alert()` / `confirm()` instead of the toast system | **Fixed** — `store/confirm.ts`, `components/ui/confirm-dialog.tsx` + 8 pages |
+| H12, all P2/P3 | everything else | Open |
 
-Verification of the four fixes: ESLint unchanged (8 output lines = the 7 pre-existing warnings, 0 errors), `next build` compiles clean, backend suite `35 passed` (each new test fails with its fix stashed), and the Select/Toaster fixes were exercised with throwaway SSR and jsdom harnesses (selected label rendered, placeholder only when empty, no duplicate `id`, toast title/description in the DOM, toasts fired before the Toaster mounts are queued and flushed). B1 and B2 were additionally confirmed against the live stack (`docker compose up`): the enumeration attempt now scores 100 instead of 75, and a password change without/with the wrong current password is rejected with 400. B6 was confirmed the same way — a draft lesson becomes visible to a student only after an explicit publish, and disappears again when it is unpublished. H6 was confirmed the same way: `javascript:`, `data:`, `file:`, `//host/x` and `ftp:` submissions are all rejected with 422, while `https://example.com/work.zip` is accepted, stored and shown to the instructor. The backend suite is now `38 passed`. The frontend still has no unit-test runner — `npm test` has no Jest config, `jest-environment-jsdom` or testing-library in `devDependencies`.
+Verification of the four fixes: ESLint unchanged (8 output lines = the 7 pre-existing warnings, 0 errors), `next build` compiles clean, backend suite `35 passed` (each new test fails with its fix stashed), and the Select/Toaster fixes were exercised with throwaway SSR and jsdom harnesses (selected label rendered, placeholder only when empty, no duplicate `id`, toast title/description in the DOM, toasts fired before the Toaster mounts are queued and flushed). B1 and B2 were additionally confirmed against the live stack (`docker compose up`): the enumeration attempt now scores 100 instead of 75, and a password change without/with the wrong current password is rejected with 400. B6 was confirmed the same way — a draft lesson becomes visible to a student only after an explicit publish, and disappears again when it is unpublished. H6 was confirmed the same way: `javascript:`, `data:`, `file:`, `//host/x` and `ftp:` submissions are all rejected with 422, while `https://example.com/work.zip` is accepted, stored and shown to the instructor. The backend suite is now `39 passed`. H3 was confirmed against the built bundle: `grep -r 'Admin123!@#' .next/` finds nothing, while `GET /auth/demo-accounts` answers 200 in development and 404 once `ENVIRONMENT=production`. The frontend still has no unit-test runner — `npm test` has no Jest config, `jest-environment-jsdom` or testing-library in `devDependencies`.
 
 ---
 
@@ -151,11 +155,11 @@ Backend (`app/api/v1/endpoints/courses.py:48-59`): with `mine=true` the instruct
 
 ### H2 · The forgot-password flow cannot be completed in production
 **`src/app/forgot-password/page.tsx:39-42, :133-137`** — after requesting a reset the UI *always* advances to the reset step and asks the user to "Paste the token from your email". The backend only returns `reset_token` inline in development (`DEBUG_RESET_TOKEN`); there is no mail service, so in production the token is never delivered and never arrives. The page also never reads a token from the URL.
-**Fix:** in production, stay on an "check your email" confirmation step; add `/forgot-password/reset` that reads `reset_token` from `useSearchParams` and pre-fills the field; gate the dev prefill behind `ENVIRONMENT === development`.
+**Fix (done):** the reset form is now shared (`components/auth/reset-password-form.tsx`) and there are two ways in. The request step advances to a "Check your email" confirmation when the API returns no token — the production case — with an "I have a reset token" escape hatch. `/forgot-password/reset` reads `token` (or `reset_token`) from the URL, which is what an emailed link would carry, and pre-fills the field. The inline token and the "Dev mode" notice only appear when the API actually returns one, so the development shortcut still works and production no longer dead-ends.
 
-### H3 · The login page ships rotated seed credentials in the client bundle
-**`src/app/login/page.tsx:23-27`** — the "Quick access" panel hard-codes `admin@lms.com / Admin123!@#`, `instructor@lms.com / Instructor123!@#`, `student@lms.com / Student123!@#`. Those passwords are the live seed passwords (`scripts/init_db.py`), so clicking a role button does log in — but the credentials are readable in the shipped JavaScript, and the panel stays in the bundle on a public deployment.
-**Fix:** delete the panel from the production bundle (gate on `NEXT_PUBLIC_ENV !== "production"`), and rotate the seed accounts per AGENTS.md before any deployment.
+### H3 · The login page ships the seed credentials in the client bundle
+**`src/app/login/page.tsx:23-27`** — the "Quick access" panel hard-coded `admin@lms.com / Admin123!@#`, `instructor@lms.com / Instructor123!@#`, `student@lms.com / Student123!@#`. Those are the live seed passwords (`scripts/init_db.py`), so clicking a role button does log in — but the credentials were readable in the shipped JavaScript, and the panel stayed in the bundle on a public deployment.
+**Fix (done):** the credentials were moved to `app/core/demo_accounts.py` and are served by one API endpoint, `GET /auth/demo-accounts`, which 404s unless `ENVIRONMENT=development`. The login page fetches them and only renders the panel when the fetch succeeds, so the credentials are no longer in the bundle at all (verified: the built `.next` output contains none of the three passwords). `scripts/init_db.py` now seeds from the same constants, so there is one source of truth.
 
 ### H4 · The profile password form never verifies the current password
 **`src/app/profile/page.tsx:77` (validation), `:92-94` (request), `:275` (input)** — the "Current password" field is required by the form but is never sent. `authApi.updateProfile({ password })` → `PUT /users/me` → `app/schemas/user.py:14-21` has no current-password field and `app/api/v1/endpoints/users.py:71-73` hashes the new password directly. Anyone holding a valid JWT can rotate the account password without knowing the current one; the field is decorative.
@@ -191,7 +195,7 @@ Backend (`app/api/v1/endpoints/courses.py:48-59`): with `mine=true` the instruct
 
 ### H11 · Due dates are shifted by the UTC/local mismatch
 **`src/app/dashboard/courses/[courseId]/assignments/page.tsx:504-509`** — `new Date(due_date).toISOString().slice(0,16)` formats **UTC** into a `<input type="datetime-local">`, which expects **local** time. In Asia/Manila (UTC+8) an 08:00 due date displays as 00:00; on save the naive local string is posted verbatim and stored as UTC, shifting it again.
-**Fix:** format with `getFullYear/getMonth/getDate/getHours/getMinutes`; convert back with `new Date(value).toISOString()`.
+**Fix (done):** `toDateTimeLocal()` (`lib/format.ts`) renders the input with the local getters, and `fromDateTimeLocal()` converts the naive local string the control reports back into a UTC ISO timestamp. The editor and the list (which already showed the browser's local time) now agree, and a save no longer shifts the date. The due date is still stored as an absolute instant, so the "overdue" check is unaffected.
 
 ### H12 · API client: no timeout, no abort, and 307 redirects on every collection call
 **`src/lib/api.ts:57, :73-75, :126, :134-139`** — `fetch` is issued with no `AbortController` and no timeout (a stalled backend hangs the request forever); endpoints are built without trailing-slash normalisation while the backend redirects `/courses` → `/courses/` (307), costing an extra round trip per list call and risking header/credential semantics.
@@ -199,7 +203,7 @@ Backend (`app/api/v1/endpoints/courses.py:48-59`): with `mine=true` the instruct
 
 ### H13 · Native `alert()` / `confirm()` instead of the toast system
 12 call sites across 8 files: `src/app/dashboard/courses/[courseId]/quizzes/page.tsx:118,198,244`; `src/app/dashboard/assignments/page.tsx:210`; `src/app/dashboard/notifications/page.tsx:158`; `src/app/dashboard/courses/page.tsx:179`; `src/app/dashboard/courses/[courseId]/assignments/page.tsx:163,189,236`; `src/app/components/discussions/course-discussions.tsx:108,116`; `src/app/courses/[id]/page.tsx:438`; `src/app/courses/[id]/learn/page.tsx:226`. They block the main thread, ignore the theme, and are inconsistent with the `role="alert"` / `setFormError` pattern already used in `courses/page.tsx:485-489`.
-**Fix:** land C1 first, then convert every call to `toast()` + inline field errors.
+**Fix (done):** `window.confirm` is replaced by `confirmAction()` (`store/confirm.ts`) — a promise-based confirmation rendered by the app's Radix `Dialog` (`components/ui/confirm-dialog.tsx`, mounted once in the root layout), so a destructive action reads `if (!await confirmAction({...})) return`. The `alert()` calls became toasts, and the delete handlers that previously swallowed the API error now report it. No native `alert(`/`confirm(` remains in `src/`.
 
 ---
 
@@ -329,4 +333,4 @@ The three `exhaustive-deps` findings are the same class of bug as H1/H10 (stale 
 ### Suggested fix order
 `C1 → C2 → C3 → C4` (each is small and self-contained) → `H1, H2, H3, H4` (correctness/security) → `H5-H12` → shared loader + primitive cleanups → P3 sweep.
 
-Done so far: `C1–C4`, `H1`, `H4` (via B2), `H5` (via B5), `H6`, `H7` (via B4), `H8` (via B3), `H9`, `H10`, plus `B1`–`B6`. Still open: `H2`, `H3`, `H11`, `H12`, `H13` and the P2/P3 lists.
+Done so far: `C1–C4`, `H1`, `H4` (via B2), `H5` (via B5), `H6`, `H7` (via B4), `H8` (via B3), `H9`, `H10`, `H11`, `H13`, plus `B1`–`B6`. Still open: `H12` and the P2/P3 lists.

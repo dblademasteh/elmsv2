@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { discussionApi, type DiscussionThreadRow, type DiscussionThreadDetail } from "@/lib/api"
 import { useAuthStore } from "@/store/auth"
+import { confirmAction } from "@/store/confirm"
+import { toast } from "@/components/ui/use-toast"
 
 function timeAgo(iso: string | null): string {
   if (!iso) return ""
@@ -105,17 +107,34 @@ export function CourseDiscussions({ courseId }: { courseId: string }) {
   }
 
   async function handleDeleteThread(threadId: string) {
-    if (!window.confirm("Delete this thread and all replies?")) return
+    const confirmed = await confirmAction({
+      title: "Delete this thread?",
+      description: "The thread and all of its replies will be removed.",
+      confirmLabel: "Delete",
+      destructive: true,
+    })
+    if (!confirmed) return
     const response = await discussionApi.removeThread(threadId)
-    if (response.error) return
+    if (response.error) {
+      toast({ title: "Could not delete thread", description: response.error })
+      return
+    }
     if (selected?.id === threadId) setSelected(null)
     setThreads((prev) => prev.filter((t) => t.id !== threadId))
   }
 
   async function handleDeletePost(postId: string) {
-    if (!window.confirm("Delete this reply?")) return
+    const confirmed = await confirmAction({
+      title: "Delete this reply?",
+      confirmLabel: "Delete",
+      destructive: true,
+    })
+    if (!confirmed) return
     const response = await discussionApi.removePost(postId)
-    if (response.error) return
+    if (response.error) {
+      toast({ title: "Could not delete reply", description: response.error })
+      return
+    }
     if (selected) await openThread(selected.id)
   }
 

@@ -1,6 +1,7 @@
 import "@radix-ui/themes/styles.css";
 import "@/app/globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ThemeProvider } from "@/components/theme-provider";
 
 export const metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({
         <ThemeProvider>
           <main>{children}</main>
           <Toaster />
+          <ConfirmDialog />
         </ThemeProvider>
       </body>
     </html>

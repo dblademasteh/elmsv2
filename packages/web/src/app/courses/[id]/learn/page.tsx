@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { courseApi, lessonApi, quizApi, enrollmentApi, reviewApi, assignmentApi } from "@/lib/api"
+import { toast } from "@/components/ui/use-toast"
 import { useAuthStore } from "@/store/auth"
 
 interface LessonAssignment {
@@ -223,7 +224,10 @@ export default function CourseLearnPage() {
     if (currentLessonIndex < lessons.length - 1) {
       setCurrentLessonIndex(currentLessonIndex + 1)
     } else {
-      alert("Congratulations! You've completed all lessons in this course.")
+      toast({
+        title: "Course completed",
+        description: "Congratulations! You've completed all lessons in this course.",
+      })
     }
   }
 

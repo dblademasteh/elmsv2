@@ -175,3 +175,27 @@ def test_reset_token_is_not_disclosed_unless_opted_in(client, monkeypatch):
     request = client.post("/api/v1/auth/reset-password", json={"email": email})
     assert request.status_code == 200
     assert "reset_token" not in request.json()
+
+
+def test_demo_accounts_are_development_only(client, monkeypatch):
+    """The demo credentials may only be served outside production.
+
+    The login page's "quick access" panel fetches them, so the endpoint is
+    the only place they live — a deployment must not answer it.
+    """
+    from app.core.config import settings
+
+    development = client.get("/api/v1/auth/demo-accounts")
+    assert development.status_code == 200, development.text
+    accounts = development.json()
+    assert {a["email"] for a in accounts} == {
+        "admin@lms.com",
+        "instructor@lms.com",
+        "student@lms.com",
+    }
+    assert all(a["password"] for a in accounts)
+
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    production = client.get("/api/v1/auth/demo-accounts")
+    assert production.status_code == 404
+    assert "Admin123" not in production.text

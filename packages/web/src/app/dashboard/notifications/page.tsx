@@ -21,6 +21,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
+import { confirmAction } from "@/store/confirm"
 import {
   Dialog,
   DialogContent,
@@ -170,7 +171,12 @@ export default function NotificationsPage() {
   }
 
   async function handleDelete(announcement: Announcement) {
-    if (!window.confirm("Delete this announcement?")) return
+    const confirmed = await confirmAction({
+      title: "Delete this announcement?",
+      confirmLabel: "Delete",
+      destructive: true,
+    })
+    if (!confirmed) return
     const resp = await announcementApi.remove(announcement.id)
     if (resp.error) {
       toast({ title: "Could not delete announcement", description: resp.error })

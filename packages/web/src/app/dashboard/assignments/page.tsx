@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, FileText, Calendar, Clock, Upload } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
 
 interface Enrollment {
   id: string
@@ -213,7 +214,10 @@ export default function StudentAssignmentsPage() {
       setShowSubmitModal(null)
       await loadData()
     } catch (err) {
-      alert(`Submission failed: ${err instanceof Error ? err.message : String(err)}`)
+      toast({
+        title: "Submission failed",
+        description: err instanceof Error ? err.message : String(err),
+      })
     } finally {
       setSubmittingId(null)
     }

@@ -3,14 +3,17 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, GraduationCap, KeyRound, Loader2, Mail } from "lucide-react"
+import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, GraduationCap, Loader2, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { authApi } from "@/lib/api"
+import { ResetPasswordForm } from "@/components/auth/reset-password-form"
+
+type Step = "request" | "sent" | "reset" | "done"
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
-  const [step, setStep] = useState<"request" | "reset" | "done">("request")
+  const [step, setStep] = useState<Step>("request")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -18,8 +21,6 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [resetToken, setResetToken] = useState("")
   const [devToken, setDevToken] = useState<string | null>(null)
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
 
   async function handleRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -37,36 +38,14 @@ export default function ForgotPasswordPage() {
       }
       setInfo(response.data?.message ?? "If an account with that email exists, a reset link has been sent.")
       if (response.data?.reset_token) {
+        // Only the development API hands the token back; there is no mail
+        // service, so the reset can only be completed inline.
         setDevToken(response.data.reset_token)
         setResetToken(response.data.reset_token)
+        setStep("reset")
+      } else {
+        setStep("sent")
       }
-      setStep("reset")
-    } catch {
-      setError("An unexpected error occurred")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  async function handleReset(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (newPassword.length < 8) {
-      setError("New password must be at least 8 characters.")
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      setError("Passwords do not match.")
-      return
-    }
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await authApi.resetPassword(resetToken.trim(), newPassword)
-      if (response.error) {
-        setError(response.error)
-        return
-      }
-      setStep("done")
     } catch {
       setError("An unexpected error occurred")
     } finally {
@@ -122,6 +101,35 @@ export default function ForgotPasswordPage() {
           </>
         )}
 
+        {step === "sent" && (
+          <>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Check your email</h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              {info ?? "If an account with that email exists, a reset link has been sent."}
+              {" "}Open the link in that email to choose a new password.
+            </p>
+            {info && (
+              <div role="status" className="mt-4 rounded-lg border border-primary/25 bg-primary/10 px-4 py-3 text-sm text-foreground">
+                {info}
+              </div>
+            )}
+            <Button
+              variant="outline"
+              className="mt-6 h-12 w-full rounded-lg text-sm font-semibold"
+              onClick={() => setStep("reset")}
+            >
+              I have a reset token
+            </Button>
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              The reset link opens{" "}
+              <Link href="/forgot-password/reset" className="font-medium text-primary hover:underline">
+                the reset page
+              </Link>
+              .
+            </p>
+          </>
+        )}
+
         {step === "reset" && (
           <>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Reset your password</h1>
@@ -135,57 +143,7 @@ export default function ForgotPasswordPage() {
                 Dev mode: email delivery isn't configured, so the reset token is prefilled below.
               </p>
             )}
-            {error && (
-              <div role="alert" className="mt-4 rounded-lg border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                {error}
-              </div>
-            )}
-            <form className="mt-6 space-y-5" onSubmit={handleReset} noValidate>
-              <div className="space-y-2">
-                <Label htmlFor="token" className="text-sm font-medium">Reset token</Label>
-                <div className="relative">
-                  <KeyRound className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                  <input
-                    id="token"
-                    value={resetToken}
-                    onChange={(e) => setResetToken(e.target.value)}
-                    placeholder="Paste the token from your email"
-                    className="h-12 w-full rounded-lg border border-input bg-background pl-11 pr-4 font-mono text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-password" className="text-sm font-medium">New password</Label>
-                <input
-                  id="new-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="h-12 w-full rounded-lg border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
-                  placeholder="At least 8 characters"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password" className="text-sm font-medium">Confirm new password</Label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="h-12 w-full rounded-lg border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-ring/20"
-                  placeholder="Repeat the new password"
-                />
-              </div>
-              <Button type="submit" disabled={isLoading} className="h-12 w-full gap-2 rounded-lg text-sm font-semibold">
-                {isLoading ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Updating...</>
-                ) : (
-                  <>Update password</>
-                )}
-              </Button>
-            </form>
+            <ResetPasswordForm initialToken={resetToken} onDone={() => setStep("done")} />
           </>
         )}
 

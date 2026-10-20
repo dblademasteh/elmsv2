@@ -5,12 +5,14 @@ import { useParams } from "next/navigation"
 import { useAuthStore } from "@/store/auth"
 import { assignmentApi, lessonApi, courseApi } from "@/lib/api"
 import { safeExternalUrl } from "@/lib/urls"
+import { fromDateTimeLocal, toDateTimeLocal } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Plus, Trash2, Save, AlertCircle, Calendar, Upload, FileText, CheckCircle, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
+import { confirmAction } from "@/store/confirm"
 
 interface GradingFormProps {
   submission: Submission
@@ -201,7 +203,12 @@ export default function AssignmentManagementPage() {
   }
 
   async function handleDeleteAssignment(a: Assignment) {
-    if (!confirm(`Delete assignment "${a.title}"?`)) return
+    const confirmed = await confirmAction({
+      title: `Delete assignment "${a.title}"?`,
+      confirmLabel: "Delete",
+      destructive: true,
+    })
+    if (!confirmed) return
     setDeletingId(a.id)
     const resp = await assignmentApi.delete(a.id)
     setDeletingId(null)
@@ -231,7 +238,7 @@ export default function AssignmentManagementPage() {
   async function saveAssignment() {
     if (!editingAssignment) return
     if (!editingAssignment.title.trim()) {
-      alert("Assignment title is required")
+      toast({ title: "Assignment title is required" })
       return
     }
 
@@ -278,7 +285,10 @@ export default function AssignmentManagementPage() {
         }
       }
     } catch (err) {
-      alert(`Failed to save: ${err instanceof Error ? err.message : String(err)}`)
+      toast({
+        title: "Failed to save",
+        description: err instanceof Error ? err.message : String(err),
+      })
     } finally {
       setSavingAssignment(null)
     }
@@ -538,8 +548,8 @@ export default function AssignmentManagementPage() {
                     <label className="block text-sm font-medium mb-1">Due Date</label>
                     <input
                       type="datetime-local"
-                      value={editingAssignment.due_date ? new Date(editingAssignment.due_date).toISOString().slice(0, 16) : ""}
-                      onChange={(e) => setEditingAssignment({ ...editingAssignment, due_date: e.target.value ? e.target.value : null })}
+                      value={toDateTimeLocal(editingAssignment.due_date)}
+                      onChange={(e) => setEditingAssignment({ ...editingAssignment, due_date: fromDateTimeLocal(e.target.value) })}
                       className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
                     />
                   </div>

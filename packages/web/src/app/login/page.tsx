@@ -20,11 +20,11 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>
 
-const demoUsers = [
-  { role: "Admin", email: "admin@lms.com", password: "Admin123!@#" },
-  { role: "Instructor", email: "instructor@lms.com", password: "Instructor123!@#" },
-  { role: "Student", email: "student@lms.com", password: "Student123!@#" },
-]
+interface DemoAccount {
+  role: string
+  email: string
+  password: string
+}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -33,6 +33,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rememberMe, setRememberMe] = useState(true)
+  // The seeded demo accounts are served by the API in development only, so
+  // the credentials are not part of this bundle.
+  const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([])
 
   const {
     register,
@@ -46,6 +49,18 @@ export default function LoginPage() {
       router.replace("/dashboard")
     }
   }, [isAuthenticated, router])
+
+  // The quick-access panel only exists when the API serves the demo
+  // accounts, which it only does outside production.
+  useEffect(() => {
+    let cancelled = false
+    authApi.demoAccounts().then((response) => {
+      if (!cancelled && response.data) setDemoAccounts(response.data)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true)
@@ -216,22 +231,24 @@ export default function LoginPage() {
                 )}
               </Button>
 
-              <div className="pt-2">
-                <p className="mb-3 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">Quick access</p>
-                <div className="grid grid-cols-1 gap-2">
-                  {demoUsers.map((u) => (
-                    <button
-                      key={u.role}
-                      type="button"
-                      onClick={() => fillDemo(u.email, u.password)}
-                      className="group flex items-center justify-between rounded-xl border border-border/70 bg-muted/40 px-3.5 py-2.5 text-left text-xs transition-colors hover:bg-muted/70 hover:border-border"
-                    >
-                      <span className="font-medium text-foreground">{u.role}</span>
-                      <span className="truncate text-muted-foreground">{u.email}</span>
-                    </button>
-                  ))}
+              {demoAccounts.length > 0 && (
+                <div className="pt-2">
+                  <p className="mb-3 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">Quick access</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {demoAccounts.map((u) => (
+                      <button
+                        key={u.email}
+                        type="button"
+                        onClick={() => fillDemo(u.email, u.password)}
+                        className="group flex items-center justify-between rounded-xl border border-border/70 bg-muted/40 px-3.5 py-2.5 text-left text-xs transition-colors hover:bg-muted/70 hover:border-border"
+                      >
+                        <span className="font-medium capitalize text-foreground">{u.role}</span>
+                        <span className="truncate text-muted-foreground">{u.email}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </form>
 
             <p className="mt-8 border-t border-border/70 pt-6 text-center text-sm text-muted-foreground">

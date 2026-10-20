@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Plus, Trash2, Save, AlertCircle, ClipboardList } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
+import { confirmAction } from "@/store/confirm"
 
 type QuestionType = "multiple_choice" | "enumeration" | "identification" | "true_false" | "essay"
 type QuizType = "multiple_choice" | "enumeration" | "identification" | "true_false" | "essay"
@@ -116,7 +117,12 @@ export default function QuizManagementPage() {
   }
 
   async function handleDeleteQuiz(quiz: Quiz) {
-    if (!confirm(`Delete quiz "${quiz.title}"?`)) return
+    const confirmed = await confirmAction({
+      title: `Delete quiz "${quiz.title}"?`,
+      confirmLabel: "Delete",
+      destructive: true,
+    })
+    if (!confirmed) return
     setDeletingQuiz(quiz.id)
     const resp = await quizApi.delete(quiz.id)
     setDeletingQuiz(null)
@@ -200,7 +206,7 @@ export default function QuizManagementPage() {
     if (!editingQuiz) return
     const validationError = validateQuiz(editingQuiz)
     if (validationError) {
-      alert(validationError)
+      toast({ title: validationError })
       return
     }
 
@@ -246,7 +252,10 @@ export default function QuizManagementPage() {
       }
       setEditingQuiz(null)
     } catch (err) {
-      alert(`Failed to save quiz: ${err instanceof Error ? err.message : String(err)}`)
+      toast({
+        title: "Failed to save quiz",
+        description: err instanceof Error ? err.message : String(err),
+      })
     } finally {
       setSavingQuiz(null)
     }

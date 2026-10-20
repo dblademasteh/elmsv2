@@ -11,6 +11,7 @@ import { authApi, courseApi, enrollmentApi, reviewApi, lessonApi } from "@/lib/a
 import { useAuthStore } from "@/store/auth"
 import { formatCurrency } from "@/lib/format"
 import { CourseDiscussions } from "@/components/discussions/course-discussions"
+import { toast } from "@/components/ui/use-toast"
 
 export default function CoursePage() {
   const params = useParams()
@@ -435,7 +436,10 @@ export default function CoursePage() {
                           const summaryResp = await reviewApi.getRatingSummary(courseId)
                           if (summaryResp.data) setRatingSummary(summaryResp.data)
                         } else {
-                          alert(resp.error || "Failed to submit review")
+                          toast({
+                            title: "Failed to submit review",
+                            description: resp.error || "Please try again.",
+                          })
                         }
                         setSubmittingReview(false)
                       }}
