@@ -334,6 +334,25 @@ export const enrollmentApi = {
 };
 
 // Quiz endpoints
+export interface QuizAttempt {
+  id: string;
+  quiz_id: string;
+  user_id: string;
+  user_full_name?: string | null;
+  enrollment_id: string | null;
+  started_at: string;
+  completed_at: string | null;
+  score: number | null;
+  grade: number | null;
+  passed: boolean;
+  answers: Array<Record<string, unknown>> | null;
+  attempt_number: number;
+  needs_review: boolean;
+  graded_by: string | null;
+  graded_at: string | null;
+  feedback: string | null;
+}
+
 export const quizApi = {
   getByCourse: (courseId: string) =>
     api.get<Array<{
@@ -386,7 +405,7 @@ export const quizApi = {
       created_at: string;
     }>(`/courses/quizzes/${quizId}`),
 
-  create: (data: { lesson_id: string; title: string; questions: Array<Record<string, unknown>>; description?: string; time_limit_seconds?: number; max_attempts?: number; passing_grade?: number; quiz_type?: string }) =>
+  create: (data: { lesson_id: string; title: string; questions: Array<Record<string, unknown>>; description?: string; time_limit_seconds?: number; max_attempts?: number; passing_grade?: number; quiz_type?: string; randomize_questions?: boolean; show_results?: boolean; allow_retry?: boolean }) =>
     api.post(`/courses/quizzes`, data),
 
   update: (id: string, data: Record<string, unknown>) =>
@@ -409,29 +428,26 @@ export const quizApi = {
   submitAttempt: (quizId: string, answers: Array<Record<string, unknown>>, attemptId?: string | null) =>
     api.post<{
       attempt_id: string;
-      score: number;
-      grade: number;
+      score: number | null;
+      grade: number | null;
       passed: boolean;
       passing_grade: number;
       total_points: number;
       earned_points: number;
       feedback: string | null;
+      needs_review: boolean;
+      results_hidden: boolean;
     }>(`/courses/quizzes/${quizId}/attempt`, attemptId ? { answers, attempt_id: attemptId } : { answers }),
 
   getMyAttempts: (quizId: string) =>
-    api.get<Array<{
-      id: string;
-      quiz_id: string;
-      user_id: string;
-      enrollment_id: string | null;
-      started_at: string;
-      completed_at: string | null;
-      score: number | null;
-      grade: number | null;
-      passed: boolean;
-      answers: Array<Record<string, unknown>> | null;
-      attempt_number: number;
-    }>>(`/courses/quizzes/${quizId}/attempts`),
+    api.get<Array<QuizAttempt>>(`/courses/quizzes/${quizId}/attempts`),
+
+  /** Instructors: grade the manually graded part of an attempt. */
+  gradeAttempt: (attemptId: string, points: number, feedback?: string) =>
+    api.put<QuizAttempt>(`/courses/quizzes/attempts/${attemptId}/grade`, {
+      points,
+      feedback,
+    }),
 };
 
 // Assignment endpoints

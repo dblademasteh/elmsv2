@@ -1,0 +1,347 @@
+"""Quiz workflow tests: type taxonomy, grading, answer keys, manual review."""
+import uuid
+
+QUIZES = "/api/v1/courses/quizzes"
+
+AUTO_QUESTIONS = [
+    {
+        "id": "q_mc",
+        "type": "multiple_choice",
+        "question": "Which city is the capital of France?",
+        "options": ["Berlin", "Paris", "Madrid"],
+        "correct_answer": 1,
+        "points": 1,
+    },
+    {
+        "id": "q_enum",
+        "type": "enumeration",
+        "question": "Name a primary colour",
+        "correct_answer": "red",
+        "points": 1,
+    },
+    {
+        "id": "q_ident",
+        "type": "identification",
+        "question": "Identify the process plants use to make food",
+        "correct_answer": "Photosynthesis",
+        "points": 1,
+    },
+    {
+        "id": "q_tf",
+        "type": "true_false",
+        "question": "Water boils at 100C at sea level",
+        "correct_answer": "true",
+        "points": 1,
+    },
+]
+
+CORRECT_ANSWERS = [
+    {"question_id": "q_mc", "answer": "1", "answer_index": 1},
+    {"question_id": "q_enum", "answer": "  Red  "},
+    {"question_id": "q_ident", "answer": "photosynthesis"},
+    {"question_id": "q_tf", "answer": "true"},
+]
+
+WRONG_ANSWERS = [
+    {"question_id": "q_mc", "answer": "0", "answer_index": 0},
+    {"question_id": "q_enum", "answer": "green"},
+    {"question_id": "q_ident", "answer": "respiration"},
+    {"question_id": "q_tf", "answer": "false"},
+]
+
+
+def _create_course(client, headers):
+    response = client.post(
+        "/api/v1/courses/",
+        headers=headers,
+        json={
+            "title": f"Quiz Course {uuid.uuid4().hex[:6]}",
+            "short_description": "Quiz test course",
+            "description": "Created by the automated suite",
+            "level": "beginner",
+            "price_cents": 0,
+        },
+    )
+    assert response.status_code == 201, response.text
+    course = response.json()
+    client.put(
+        f"/api/v1/courses/{course['id']}", headers=headers, json={"status": "published"}
+    )
+    return course
+
+
+def _create_lesson(client, headers, course_id):
+    response = client.post(
+        "/api/v1/courses/lessons",
+        headers=headers,
+        json={"course_id": course_id, "title": "Quiz Lesson", "position": 0},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _create_quiz(client, headers, lesson_id, questions, quiz_type="multiple_choice", **extra):
+    payload = {
+        "lesson_id": lesson_id,
+        "title": f"Quiz {uuid.uuid4().hex[:6]}",
+        "questions": questions,
+        "quiz_type": quiz_type,
+        "passing_grade": 50,
+    }
+    payload.update(extra)
+    response = client.post(f"{QUIZES}", headers=headers, json=payload)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _enroll(client, headers, course_id):
+    response = client.post(
+        "/api/v1/enrollments/", headers=headers, json={"course_id": course_id}
+    )
+    assert response.status_code in (200, 201), response.text
+
+
+def _submit(client, headers, quiz_id, answers):
+    start = client.post(f"{QUIZES}/{quiz_id}/start", headers=headers, json={})
+    assert start.status_code == 200, start.text
+    attempt_id = start.json()["attempt_id"]
+    response = client.post(
+        f"{QUIZES}/{quiz_id}/attempt",
+        headers=headers,
+        json={"attempt_id": attempt_id, "answers": answers},
+    )
+    return response
+
+
+def test_quiz_type_is_persisted_and_updatable(client, auth_headers):
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+
+    quiz = _create_quiz(
+        client, auth_headers["instructor"], lesson["id"], AUTO_QUESTIONS, quiz_type="essay"
+    )
+    assert quiz["quiz_type"] == "essay"
+
+    fetched = client.get(f"{QUIZES}/{quiz['id']}", headers=auth_headers["instructor"]).json()
+    assert fetched["quiz_type"] == "essay"
+
+    updated = client.put(
+        f"{QUIZES}/{quiz['id']}",
+        headers=auth_headers["instructor"],
+        json={"quiz_type": "enumeration"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["quiz_type"] == "enumeration"
+
+    fetched = client.get(f"{QUIZES}/{quiz['id']}", headers=auth_headers["instructor"]).json()
+    assert fetched["quiz_type"] == "enumeration"
+
+
+def test_quiz_settings_can_be_updated_and_cleared(client, auth_headers):
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+    quiz = _create_quiz(
+        client,
+        auth_headers["instructor"],
+        lesson["id"],
+        AUTO_QUESTIONS,
+        time_limit_seconds=600,
+    )
+    assert quiz["time_limit_seconds"] == 600
+
+    updated = client.put(
+        f"{QUIZES}/{quiz['id']}",
+        headers=auth_headers["instructor"],
+        json={"time_limit_seconds": None, "show_results": False},
+    )
+    assert updated.status_code == 200, updated.text
+    body = updated.json()
+    assert body["time_limit_seconds"] is None
+    assert body["show_results"] is False
+
+
+def test_unsupported_quiz_type_is_rejected(client, auth_headers):
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+
+    response = client.post(
+        f"{QUIZES}",
+        headers=auth_headers["instructor"],
+        json={
+            "lesson_id": lesson["id"],
+            "title": "Bad type quiz",
+            "questions": AUTO_QUESTIONS,
+            "quiz_type": "fill_in_the_blank",
+        },
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_answer_key_is_not_exposed_to_students(client, auth_headers):
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+    quiz = _create_quiz(client, auth_headers["instructor"], lesson["id"], AUTO_QUESTIONS)
+    _enroll(client, auth_headers["student"], course["id"])
+
+    student_view = client.get(f"{QUIZES}/{quiz['id']}", headers=auth_headers["student"])
+    assert student_view.status_code == 200, student_view.text
+    for question in student_view.json()["questions"]:
+        assert "correct_answer" not in question
+
+    instructor_view = client.get(
+        f"{QUIZES}/{quiz['id']}", headers=auth_headers["instructor"]
+    ).json()
+    assert instructor_view["questions"][0]["correct_answer"] == 1
+
+
+def test_auto_graded_questions_score_correctly(client, auth_headers):
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+    quiz = _create_quiz(client, auth_headers["instructor"], lesson["id"], AUTO_QUESTIONS)
+    _enroll(client, auth_headers["student"], course["id"])
+
+    response = _submit(client, auth_headers["student"], quiz["id"], CORRECT_ANSWERS)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["score"] == 100.0
+    assert result["earned_points"] == 4
+    assert result["total_points"] == 4
+    assert result["passed"] is True
+    assert result["needs_review"] is False
+
+    # A second attempt with wrong answers scores zero
+    response = _submit(client, auth_headers["student"], quiz["id"], WRONG_ANSWERS)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["score"] == 0.0
+    assert result["passed"] is False
+
+
+def test_enumeration_accepts_multiple_answers(client, auth_headers):
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+    questions = [
+        {
+            "id": "q_alt",
+            "type": "enumeration",
+            "question": "Name the capital of France",
+            "correct_answer": "Paris | Paris, France",
+            "points": 5,
+        }
+    ]
+    quiz = _create_quiz(client, auth_headers["instructor"], lesson["id"], questions)
+    _enroll(client, auth_headers["student"], course["id"])
+
+    response = _submit(
+        client,
+        auth_headers["student"],
+        quiz["id"],
+        [{"question_id": "q_alt", "answer": "paris, france"}],
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["score"] == 100.0
+
+
+def test_essay_attempt_awaits_instructor_review(client, auth_headers):
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+    questions = [
+        {
+            "id": "q_essay",
+            "type": "essay",
+            "question": "Explain why the sky is blue",
+            "points": 10,
+        }
+    ]
+    quiz = _create_quiz(
+        client, auth_headers["instructor"], lesson["id"], questions, quiz_type="essay"
+    )
+    _enroll(client, auth_headers["student"], course["id"])
+
+    response = _submit(
+        client,
+        auth_headers["student"],
+        quiz["id"],
+        [{"question_id": "q_essay", "answer": "Rayleigh scattering"}],
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["needs_review"] is True
+    assert result["score"] is None
+    assert result["passed"] is False
+
+    # The instructor sees the attempt and the student's answer
+    attempts = client.get(f"{QUIZES}/{quiz['id']}/attempts", headers=auth_headers["instructor"])
+    assert attempts.status_code == 200, attempts.text
+    attempt = attempts.json()[0]
+    assert attempt["needs_review"] is True
+    assert attempt["answers"][0]["answer"] == "Rayleigh scattering"
+
+    # Students cannot grade
+    forbidden = client.put(
+        f"{QUIZES}/attempts/{attempt['id']}/grade",
+        headers=auth_headers["student"],
+        json={"points": 10},
+    )
+    assert forbidden.status_code == 403, forbidden.text
+
+    # The instructor awards points for the written question
+    graded = client.put(
+        f"{QUIZES}/attempts/{attempt['id']}/grade",
+        headers=auth_headers["instructor"],
+        json={"points": 8, "feedback": "Good explanation"},
+    )
+    assert graded.status_code == 200, graded.text
+    body = graded.json()
+    assert body["score"] == 80.0
+    assert body["passed"] is True
+    assert body["needs_review"] is False
+    assert body["feedback"] == "Good explanation"
+    assert body["graded_by"] is not None
+
+    # The student now sees the final score
+    student_attempts = client.get(
+        f"{QUIZES}/{quiz['id']}/attempts", headers=auth_headers["student"]
+    ).json()
+    assert student_attempts[0]["score"] == 80.0
+    assert student_attempts[0]["needs_review"] is False
+
+
+def test_hidden_results_are_not_revealed_to_students(client, auth_headers):
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+    quiz = _create_quiz(
+        client,
+        auth_headers["instructor"],
+        lesson["id"],
+        AUTO_QUESTIONS,
+        show_results=False,
+    )
+    _enroll(client, auth_headers["student"], course["id"])
+
+    response = _submit(client, auth_headers["student"], quiz["id"], CORRECT_ANSWERS)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["results_hidden"] is True
+    assert result["score"] is None
+
+    student_attempts = client.get(
+        f"{QUIZES}/{quiz['id']}/attempts", headers=auth_headers["student"]
+    ).json()
+    assert student_attempts[0]["score"] is None
+    assert student_attempts[0]["grade"] is None
+
+    # Staff still see the real result
+    staff_attempts = client.get(
+        f"{QUIZES}/{quiz['id']}/attempts", headers=auth_headers["instructor"]
+    ).json()
+    assert staff_attempts[0]["score"] == 100.0
+
+
+def test_student_cannot_take_quiz_without_enrollment(client, auth_headers):
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+    quiz = _create_quiz(client, auth_headers["instructor"], lesson["id"], AUTO_QUESTIONS)
+
+    response = client.post(f"{QUIZES}/{quiz['id']}/start", headers=auth_headers["student"], json={})
+    assert response.status_code == 403, response.text

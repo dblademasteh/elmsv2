@@ -32,6 +32,10 @@ async def init_db():
     alter_statements = [
         "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS section_title VARCHAR(255)",
         "ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS quiz_type VARCHAR(50) DEFAULT 'multiple_choice'",
+        "ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS needs_review BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS graded_by UUID",
+        "ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS graded_at TIMESTAMPTZ",
+        "ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS feedback TEXT",
     ]
     async with engine.begin() as conn:
         for statement in alter_statements:

@@ -4,11 +4,12 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { useAuthStore } from "@/store/auth"
 import { quizApi, lessonApi } from "@/lib/api"
+import { QUIZ_TYPES } from "@/lib/quiz-types"
+import { AttemptReview } from "@/components/quizzes/attempt-review"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
-import { Plus, Trash2, Save, HelpCircle, AlertCircle } from "lucide-react"
-import type { ComponentType } from "react"
+import { Plus, Trash2, Save, AlertCircle, ClipboardList } from "lucide-react"
 
 type QuestionType = "multiple_choice" | "enumeration" | "identification" | "true_false" | "essay"
 type QuizType = "multiple_choice" | "enumeration" | "identification" | "true_false" | "essay"
@@ -44,13 +45,10 @@ interface Lesson {
   position: number
 }
 
-const QUESTION_TYPES: { value: QuestionType; label: string; icon: ComponentType<any> }[] = [
-  { value: "multiple_choice", label: "Multiple Choice", icon: HelpCircle },
-  { value: "enumeration", label: "Enumeration", icon: HelpCircle },
-  { value: "identification", label: "Identification", icon: HelpCircle },
-  { value: "true_false", label: "True / False", icon: HelpCircle },
-  { value: "essay", label: "Essay", icon: HelpCircle },
-]
+const QUESTION_TYPES: { value: QuestionType; label: string }[] = QUIZ_TYPES.map((t) => ({
+  value: t.value as QuestionType,
+  label: t.label,
+}))
 
 export default function QuizManagementPage() {
   const params = useParams()
@@ -64,6 +62,7 @@ export default function QuizManagementPage() {
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null)
   const [savingQuiz, setSavingQuiz] = useState<string | null>(null)
   const [deletingQuiz, setDeletingQuiz] = useState<string | null>(null)
+  const [reviewingQuiz, setReviewingQuiz] = useState<Quiz | null>(null)
 
   useEffect(() => {
     if (courseId) {
@@ -154,14 +153,42 @@ export default function QuizManagementPage() {
     })
   }
 
+  function validateQuiz(quiz: Quiz): string | null {
+    if (quiz.title.trim().length < 3) {
+      return "Quiz title must be at least 3 characters"
+    }
+    if (quiz.questions.length === 0) {
+      return "Add at least one question"
+    }
+    for (let i = 0; i < quiz.questions.length; i++) {
+      const q = quiz.questions[i]
+      if (!q.question.trim()) {
+        return `Question ${i + 1} needs a question text`
+      }
+      if (q.type === "multiple_choice") {
+        const options = (q.options || []).filter((o) => o.trim())
+        if (options.length < 2) {
+          return `Question ${i + 1} needs at least two answer options`
+        }
+        if (q.correct_answer === undefined || q.correct_answer === null) {
+          return `Question ${i + 1} needs a correct answer selected`
+        }
+      }
+      if (
+        (q.type === "enumeration" || q.type === "identification") &&
+        !String(q.correct_answer || "").trim()
+      ) {
+        return `Question ${i + 1} needs the accepted answer`
+      }
+    }
+    return null
+  }
+
   async function saveQuiz() {
     if (!editingQuiz) return
-    if (!editingQuiz.title.trim()) {
-      alert("Quiz title is required")
-      return
-    }
-    if (editingQuiz.questions.length === 0) {
-      alert("Add at least one question")
+    const validationError = validateQuiz(editingQuiz)
+    if (validationError) {
+      alert(validationError)
       return
     }
 
@@ -171,11 +198,15 @@ export default function QuizManagementPage() {
         const resp = await quizApi.create({
           lesson_id: editingQuiz.lesson_id,
           title: editingQuiz.title,
+          description: editingQuiz.description ?? undefined,
           questions: editingQuiz.questions as unknown as Array<Record<string, unknown>>,
           time_limit_seconds: editingQuiz.time_limit_seconds ?? undefined,
           max_attempts: editingQuiz.max_attempts,
           passing_grade: editingQuiz.passing_grade,
           quiz_type: editingQuiz.quiz_type,
+          randomize_questions: editingQuiz.randomize_questions,
+          show_results: editingQuiz.show_results,
+          allow_retry: editingQuiz.allow_retry,
         })
         if (resp.data) {
           setQuizzes([...quizzes, resp.data as unknown as Quiz])
@@ -289,6 +320,9 @@ export default function QuizManagementPage() {
                               </p>
                             </div>
                             <div className="flex gap-2">
+                              <Button size="sm" variant="ghost" onClick={() => setReviewingQuiz(quiz)}>
+                                <ClipboardList className="h-4 w-4 mr-1" /> Attempts
+                              </Button>
                               <Button size="sm" variant="ghost" onClick={() => handleEditQuiz(quiz)}>
                                 Edit
                               </Button>
@@ -512,14 +546,26 @@ export default function QuizManagementPage() {
                           </div>
                         )}
 
-                        {q.type !== "multiple_choice" && q.type !== "true_false" && (
-                          <input
-                            type="text"
-                            value={q.correct_answer || ""}
-                            onChange={(e) => updateQuestion(qIdx, { correct_answer: e.target.value })}
-                            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
-                            placeholder="Enter the correct answer"
-                          />
+                        {(q.type === "enumeration" || q.type === "identification") && (
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Accepted answer(s)</label>
+                            <input
+                              type="text"
+                              value={typeof q.correct_answer === "string" ? q.correct_answer : ""}
+                              onChange={(e) => updateQuestion(qIdx, { correct_answer: e.target.value })}
+                              className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
+                              placeholder="Enter the correct answer"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Separate multiple accepted answers with | (for example: Paris | Paris, France)
+                            </p>
+                          </div>
+                        )}
+
+                        {q.type === "essay" && (
+                          <p className="text-xs text-muted-foreground">
+                            Essay answers are graded manually by an instructor after submission.
+                          </p>
                         )}
 
                         <div>
@@ -553,6 +599,15 @@ export default function QuizManagementPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {reviewingQuiz && (
+          <AttemptReview
+            quizId={reviewingQuiz.id}
+            quizTitle={reviewingQuiz.title}
+            questions={reviewingQuiz.questions}
+            onClose={() => setReviewingQuiz(null)}
+          />
         )}
       </div>
     </DashboardLayout>

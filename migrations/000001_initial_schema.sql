@@ -161,6 +161,10 @@ CREATE TABLE quiz_attempts (
     passed BOOLEAN DEFAULT FALSE,
     answers JSONB,
     attempt_number INTEGER DEFAULT 1,
+    needs_review BOOLEAN NOT NULL DEFAULT FALSE,
+    graded_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    graded_at TIMESTAMP WITH TIME ZONE,
+    feedback TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

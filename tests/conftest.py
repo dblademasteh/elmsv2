@@ -12,9 +12,23 @@ import pytest
 import sqlalchemy as sa
 
 TEST_DB = "lms_test"
-ASYNC_URL = f"postgresql+asyncpg://postgres:postgres@172.20.0.2:5432/{TEST_DB}"
-SYNC_URL = f"postgresql+psycopg2://postgres:postgres@172.20.0.2:5432/{TEST_DB}"
-ADMIN_URL = "postgresql+psycopg2://postgres:postgres@172.20.0.2:5432/postgres"
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "172.20.0.2")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
+
+ASYNC_URL = (
+    f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
+    f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{TEST_DB}"
+)
+SYNC_URL = (
+    f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
+    f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{TEST_DB}"
+)
+ADMIN_URL = (
+    f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
+    f"@{POSTGRES_HOST}:{POSTGRES_PORT}/postgres"
+)
 
 # Point the application at the test database before any app import.
 os.environ["DATABASE_URL"] = ASYNC_URL

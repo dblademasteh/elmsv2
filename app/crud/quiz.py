@@ -4,7 +4,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.quiz import Quiz, QuizAttempt
 from app.models.lesson import Lesson
 from app.models.enrollment import Enrollment
-from typing import List, Optional
+from app.core.quiz_types import (
+    MANUAL_GRADING_TYPES,
+    MULTIPLE_CHOICE,
+    TRUE_FALSE,
+    accepted_answers,
+    normalize_bool,
+    normalize_points,
+    normalize_question_type,
+    normalize_text,
+)
+from typing import Any, Dict, List, Optional
 import uuid
 
 
@@ -82,6 +92,7 @@ async def update_quiz(
     show_results: bool = None,
     allow_retry: bool = None,
     quiz_type: str = None,
+    clear_time_limit: bool = False,
 ) -> Optional[Quiz]:
     """Update an existing quiz."""
     quiz = await get_quiz_by_id(db, quiz_id)
@@ -94,7 +105,9 @@ async def update_quiz(
         quiz.description = description
     if questions is not None:
         quiz.questions = questions
-    if time_limit_seconds is not None:
+    if clear_time_limit:
+        quiz.time_limit_seconds = None
+    elif time_limit_seconds is not None:
         quiz.time_limit_seconds = time_limit_seconds
     if max_attempts is not None:
         quiz.max_attempts = max_attempts
@@ -140,6 +153,16 @@ async def get_attempts_for_user(db: AsyncSession, quiz_id: uuid.UUID, user_id: u
     return result.scalars().all()
 
 
+async def get_attempts_for_quiz(db: AsyncSession, quiz_id: uuid.UUID) -> List[QuizAttempt]:
+    """Get every attempt submitted for a quiz (instructor review)."""
+    result = await db.execute(
+        select(QuizAttempt)
+        .where(QuizAttempt.quiz_id == quiz_id)
+        .order_by(QuizAttempt.attempt_number, QuizAttempt.started_at)
+    )
+    return result.scalars().all()
+
+
 async def create_quiz_attempt(
     db: AsyncSession,
     quiz_id: uuid.UUID,
@@ -162,57 +185,158 @@ async def create_quiz_attempt(
     return db_attempt
 
 
+def _index_questions(questions: Any) -> List[Dict[str, Any]]:
+    """Return questions with a canonical type and point value, keeping their ids."""
+    indexed: List[Dict[str, Any]] = []
+    for raw in questions or []:
+        if not isinstance(raw, dict):
+            continue
+        question = dict(raw)
+        question["type"] = normalize_question_type(question.get("type"))
+        question["points"] = normalize_points(question.get("points"))
+        indexed.append(question)
+    return indexed
+
+
+def _answer_lookup(answers: Any) -> Dict[str, Dict[str, Any]]:
+    """Index a student's answers by question id (first answer wins)."""
+    lookup: Dict[str, Dict[str, Any]] = {}
+    for row in answers or []:
+        if not isinstance(row, dict):
+            continue
+        qid = row.get("question_id")
+        if qid is None:
+            continue
+        lookup.setdefault(str(qid), row)
+    return lookup
+
+
+def _student_answer(answer_row: Optional[Dict[str, Any]], q_type: str) -> Any:
+    """Pull the submitted answer for a question out of an answer row."""
+    if answer_row is None:
+        return None
+    if q_type == MULTIPLE_CHOICE and answer_row.get("answer_index") is not None:
+        return answer_row.get("answer_index")
+    value = answer_row.get("answer")
+    if value is None:
+        value = answer_row.get("answer_index")
+    return value
+
+
+def _is_correct(q_type: str, student_answer: Any, correct: Any) -> bool:
+    """Compare a submitted answer with the answer key for its question type."""
+    if student_answer is None or correct is None:
+        return False
+
+    if q_type == MULTIPLE_CHOICE:
+        try:
+            return int(student_answer) == int(correct)
+        except (TypeError, ValueError):
+            return normalize_text(student_answer) == normalize_text(correct)
+
+    if q_type == TRUE_FALSE:
+        return normalize_bool(student_answer) == normalize_bool(correct)
+
+    accepted = accepted_answers(correct)
+    if not accepted:
+        return False
+    return normalize_text(student_answer) in accepted
+
+
+def _passing_grade(quiz: Quiz) -> float:
+    """The quiz's passing grade, tolerating a missing value."""
+    if quiz.passing_grade is None:
+        return 70.0
+    return float(quiz.passing_grade)
+
+
 def grade_quiz(quiz: Quiz, attempt: QuizAttempt) -> dict:
-    """Grade a quiz attempt based on the quiz's questions and the attempt's answers."""
-    questions = quiz.questions or []
-    answers = attempt.answers or []
+    """Grade a quiz attempt based on the quiz's questions and the attempt's answers.
 
-    # Build a lookup of question -> correct answer
+    Automatically graded types contribute to the score immediately. Essay
+    questions need a human grader, so the attempt is flagged for review and no
+    final score is produced until an instructor grades it.
+    """
+    questions = _index_questions(quiz.questions)
+    answers = _answer_lookup(attempt.answers)
+
     total_points = 0
+    auto_points = 0
+    manual_points = 0
     earned_points = 0
+    needs_review = False
 
-    for q in questions:
-        qid = q.get("id")
-        q_points = q.get("points", 1)
-        total_points += q_points
+    for question in questions:
+        points = question["points"]
+        total_points += points
+        q_type = question["type"]
 
-        correct = q.get("correct_answer")
-        q_type = q.get("type", "multiple_choice")
+        if q_type in MANUAL_GRADING_TYPES:
+            manual_points += points
+            needs_review = True
+            continue
 
-        # Find the student's answer for this question
-        student_answer = None
-        for a in answers:
-            if a.get("question_id") == qid:
-                student_answer = a.get("answer") or a.get("answer_index")
-                break
+        auto_points += points
+        student_answer = _student_answer(
+            answers.get(str(question.get("id"))), q_type
+        )
+        if _is_correct(q_type, student_answer, question.get("correct_answer")):
+            earned_points += points
 
-        if student_answer is not None:
-            if q_type == "multiple_choice":
-                # Correct answer can be a string or an index
-                if correct is not None:
-                    try:
-                        correct_idx = int(correct)
-                        if int(student_answer) == correct_idx:
-                            earned_points += q_points
-                    except (ValueError, TypeError):
-                        if str(student_answer) == str(correct):
-                            earned_points += q_points
-            elif q_type == "true_false":
-                if str(student_answer).lower() == str(correct).lower():
-                    earned_points += q_points
-            elif q_type == "short_answer":
-                # Case-insensitive comparison with trimmed whitespace
-                if str(student_answer).strip().lower() == str(correct).strip().lower():
-                    earned_points += q_points
+    if needs_review:
+        return {
+            "score": None,
+            "grade": None,
+            "passed": False,
+            "total_points": total_points,
+            "earned_points": earned_points,
+            "auto_points": auto_points,
+            "manual_points": manual_points,
+            "needs_review": True,
+        }
 
-    score = round((earned_points / total_points * 100), 2) if total_points > 0 else 0.0
-    grade = score
-    passed = score >= (quiz.passing_grade or 70.0)
+    score = round(earned_points / auto_points * 100, 2) if auto_points > 0 else 0.0
+    return {
+        "score": score,
+        "grade": score,
+        "passed": score >= _passing_grade(quiz),
+        "total_points": total_points,
+        "earned_points": earned_points,
+        "auto_points": auto_points,
+        "manual_points": manual_points,
+        "needs_review": False,
+    }
+
+
+def apply_manual_grade(
+    quiz: Quiz, attempt: QuizAttempt, awarded_points: float, feedback: Optional[str] = None
+) -> dict:
+    """Apply an instructor's award for the manually graded part of an attempt.
+
+    The automatically graded part is recomputed from the stored answers and
+    combined with the awarded points to produce the final score.
+    """
+    auto = grade_quiz(quiz, attempt)
+    manual_points = auto["manual_points"]
+
+    awarded = max(0.0, float(awarded_points))
+    if manual_points:
+        awarded = min(awarded, float(manual_points))
+
+    earned_points = auto["earned_points"] + awarded
+    total_points = auto["total_points"]
+    score = round(earned_points / total_points * 100, 2) if total_points > 0 else 0.0
 
     return {
         "score": score,
-        "grade": grade,
-        "passed": passed,
+        "grade": score,
+        "passed": score >= _passing_grade(quiz),
         "total_points": total_points,
         "earned_points": earned_points,
+        "auto_points": auto["auto_points"],
+        "manual_points": manual_points,
+        "manual_awarded": awarded,
+        "needs_review": False,
+        "feedback": feedback,
     }
+
