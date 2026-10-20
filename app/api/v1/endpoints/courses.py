@@ -45,6 +45,7 @@ async def list_courses(
 ):
     """List courses with search, level/price filters, and sorting."""
     instructor_id = None
+    include_own_courses = None
     if mine:
         if not credentials:
             raise HTTPException(
@@ -55,7 +56,11 @@ async def list_courses(
         user = await get_current_user_from_token(credentials, db)
         if user.role == "instructor":
             instructor_id = user.id
-        elif user.role != "admin":
+        elif user.role == "admin":
+            # Admins manage every published course, but must still see the
+            # drafts they created themselves.
+            include_own_courses = user.id
+        else:
             instructor_id = uuid.UUID(int=0)  # students: no courses
 
     rows = await get_courses(
@@ -64,6 +69,7 @@ async def list_courses(
         limit,
         featured=featured,
         instructor_id=instructor_id,
+        include_own_courses=include_own_courses,
         search=search,
         level=level,
         min_price_cents=min_price_cents,

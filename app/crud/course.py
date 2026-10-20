@@ -35,6 +35,7 @@ async def get_courses(
     limit: int = 100,
     featured: Optional[bool] = None,
     instructor_id: Optional[uuid.UUID] = None,
+    include_own_courses: Optional[uuid.UUID] = None,
     search: Optional[str] = None,
     level: Optional[str] = None,
     min_price_cents: Optional[int] = None,
@@ -45,8 +46,9 @@ async def get_courses(
 
     Returns (course, instructor_name) tuples. Published public courses by
     default; pass instructor_id to list that instructor's courses regardless
-    of status (drafts included). Supports search, level, price-range filters
-    and sorting.
+    of status (drafts included). Pass include_own_courses to list every
+    published course plus the drafts owned by that user (used for admins).
+    Supports search, level, price-range filters and sorting.
     """
     stmt = (
         select(Course, User.full_name)
@@ -55,6 +57,13 @@ async def get_courses(
     )
     if instructor_id is not None:
         stmt = stmt.where(Course.instructor_id == instructor_id)
+    elif include_own_courses is not None:
+        stmt = stmt.where(
+            or_(
+                Course.status == "published",
+                Course.instructor_id == include_own_courses,
+            )
+        )
     else:
         stmt = stmt.where(Course.status == "published")
 

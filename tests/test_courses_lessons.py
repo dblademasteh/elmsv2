@@ -45,6 +45,23 @@ def test_instructor_create_publish_and_list(client, auth_headers):
     assert any(c["id"] == course_id for c in public.json())
 
 
+def test_admin_mine_list_includes_own_drafts(client, auth_headers):
+    title = f"Admin Draft {uuid.uuid4().hex[:6]}"
+    course = _create_course(client, auth_headers["admin"], title)
+    course_id = course["id"]
+    assert course["status"] == "draft"
+
+    # The admin's own draft must be listed, otherwise a newly created
+    # course disappears from "My Courses" right after saving it.
+    mine = client.get("/api/v1/courses/?mine=true", headers=auth_headers["admin"])
+    assert any(c["id"] == course_id for c in mine.json())
+
+    # Drafts of other instructors stay out of the admin's list.
+    other = _create_course(client, auth_headers["instructor"], f"Instructor Draft {uuid.uuid4().hex[:6]}")
+    mine = client.get("/api/v1/courses/?mine=true", headers=auth_headers["admin"])
+    assert all(c["id"] != other["id"] for c in mine.json())
+
+
 def test_course_search_filter_and_sort(client, auth_headers):
     unique = uuid.uuid4().hex[:8]
     cheap = _create_course(
