@@ -53,7 +53,7 @@ const navigationGroups: NavGroup[] = [
   {
     label: "Management",
     items: [
-      { name: "Users", href: "/dashboard/users", icon: Users, roles: ["admin", "instructor"] },
+      { name: "Users", href: "/dashboard/users", icon: Users, roles: ["admin"] },
       { name: "Students", href: "/dashboard/students", icon: Users, roles: ["admin", "instructor"] },
       { name: "Exams", href: "/dashboard/exams", icon: FileCheck, roles: ["admin", "instructor"] },
       { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3, roles: ["admin", "instructor"] },

@@ -91,6 +91,7 @@ export default function ProfilePage() {
     try {
       const response = await authApi.updateProfile({
         password: newPassword,
+        current_password: currentPassword,
       })
       if (response.error) {
         setSaveError(response.error)

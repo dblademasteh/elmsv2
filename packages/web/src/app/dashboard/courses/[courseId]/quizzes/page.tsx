@@ -564,7 +564,9 @@ export default function QuizManagementPage() {
                               placeholder="Enter the correct answer"
                             />
                             <p className="text-xs text-muted-foreground mt-1">
-                              Separate multiple accepted answers with | (for example: Paris | Paris, France)
+                              {q.type === "enumeration"
+                                ? "The items you expect, separated by , or |. A student who lists the same items in the same order is marked correct."
+                                : "Separate multiple accepted answers with | (for example: Paris | Paris, France)"}
                             </p>
                           </div>
                         )}

@@ -369,7 +369,7 @@ export default function TakeQuizPage() {
                       className="w-full px-3 py-2 border border-border rounded-md"
                       placeholder={
                         qType === "enumeration"
-                          ? "List the items in order"
+                          ? "List the items in order (separate them with , or |)"
                           : "Enter the term"
                       }
                     />

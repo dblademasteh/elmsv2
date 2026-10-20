@@ -42,7 +42,6 @@ type CourseForm = {
   level: string
   price: string
   is_featured: boolean
-  is_private: boolean
 }
 
 const EMPTY_FORM: CourseForm = {
@@ -52,7 +51,6 @@ const EMPTY_FORM: CourseForm = {
   level: "beginner",
   price: "0",
   is_featured: false,
-  is_private: false,
 }
 
 function StatusBadge({ status }: { status?: string }) {
@@ -126,7 +124,6 @@ export default function DashboardCoursesPage() {
       level: course.level || "beginner",
       price: (course.price_cents / 100).toFixed(2),
       is_featured: course.is_featured ?? false,
-      is_private: false,
     })
     setFormError(null)
     setDialogOpen(true)
@@ -144,6 +141,8 @@ export default function DashboardCoursesPage() {
     }
     setSaving(true)
     setFormError(null)
+    // is_private is left out on purpose: the form has no control for it, so
+    // sending it would publish a course that was meant to stay private.
     const payload = {
       title: form.title.trim(),
       short_description: form.short_description.trim() || undefined,
@@ -151,7 +150,6 @@ export default function DashboardCoursesPage() {
       level: form.level,
       price_cents: Math.round(price * 100),
       is_featured: form.is_featured,
-      is_private: form.is_private,
     }
     const response = editing
       ? await courseApi.update(editing.id, payload)
@@ -234,11 +232,11 @@ export default function DashboardCoursesPage() {
         ) : filtered.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-12 text-center text-muted-foreground">
               <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-              <p>No courses available.</p>
+              <p>{courses.length === 0 ? "No courses available." : `No courses match “${searchQuery}”.`}</p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {courses.map((course) => (
+              {filtered.map((course) => (
                 <Card key={course.id}>
                   <CardHeader>
                     <CardTitle>{course.title}</CardTitle>

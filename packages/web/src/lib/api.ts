@@ -185,7 +185,7 @@ export const authApi = {
     headers: { Authorization: `Bearer ${token}` },
   } : {}),
 
-  updateProfile: (data: { full_name?: string; avatar_url?: string; password?: string }) =>
+  updateProfile: (data: { full_name?: string; avatar_url?: string; password?: string; current_password?: string }) =>
     api.put<User>('/users/me', data),
 
   requestPasswordReset: (email: string) =>
