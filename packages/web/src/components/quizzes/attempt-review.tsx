@@ -42,7 +42,7 @@ export function AttemptReview({ quizId, quizTitle, questions, onClose }: Attempt
     setLoading(true)
     setError(null)
     try {
-      const resp = await quizApi.getMyAttempts(quizId)
+      const resp = await quizApi.getAttempts(quizId)
       if (resp.data) {
         setAttempts(resp.data)
       } else {
@@ -67,7 +67,11 @@ export function AttemptReview({ quizId, quizTitle, questions, onClose }: Attempt
 
   async function saveGrade(attempt: QuizAttempt) {
     const raw = awards[attempt.id]
-    const points = raw === undefined ? 0 : Number(raw)
+    if (raw === undefined || raw.trim() === "") {
+      setError("Enter the points awarded before saving")
+      return
+    }
+    const points = Number(raw)
     if (Number.isNaN(points)) {
       setError("Enter a valid number of points")
       return
@@ -158,7 +162,7 @@ export function AttemptReview({ quizId, quizTitle, questions, onClose }: Attempt
                       {manualQuestions.map((question) => (
                         <div key={question.id} className="rounded-lg border border-border p-3">
                           <p className="text-xs text-muted-foreground">
-                            {questionTypeLabel(question.type)} • {question.points} pts
+                            {questionTypeLabel(normalizeQuestionType(question.type))} • {question.points} pts
                           </p>
                           <p className="text-sm font-medium mt-1">{question.question}</p>
                           <p className="text-sm mt-2 whitespace-pre-wrap">

@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth"
-import { quizApi, enrollmentApi } from "@/lib/api"
+import { quizApi } from "@/lib/api"
 import { normalizeQuestionType, questionTypeLabel } from "@/lib/quiz-types"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -49,7 +49,7 @@ export default function TakeQuizPage() {
   const params = useParams()
   const router = useRouter()
   const quizId = typeof params?.quizId === "string" ? params.quizId : ""
-  const { user, isAuthenticated, token } = useAuthStore()
+  const { token } = useAuthStore()
 
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [loading, setLoading] = useState(true)
@@ -60,92 +60,115 @@ export default function TakeQuizPage() {
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [attemptId, setAttemptId] = useState<string | null>(null)
 
+  // Guards against a second submission while one is already in flight
+  const submittingRef = useRef(false)
+  // Always points at the latest submit handler so the timer never uses stale state
+  const submitRef = useRef<() => void>(() => {})
+
+  const displayQuestions = useMemo(() => quiz?.questions || [], [quiz])
+
+  // A different exam means a clean slate
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.push("/login")
-      return
-    }
-
-    // Load quiz by ID
-    loadQuiz()
-  }, [quizId, isAuthenticated()])
-
-  // Use the questions from the quiz
-  const displayQuestions = quiz?.questions || []
-
-  async function loadQuiz() {
+    setQuiz(null)
+    setAnswers({})
+    setSubmitting(false)
+    setError(null)
+    setResult(null)
+    setTimeLeft(null)
+    setAttemptId(null)
     setLoading(true)
+    submittingRef.current = false
+  }, [quizId])
+
+  const loadQuiz = useCallback(async () => {
+    if (!quizId) return
     try {
       const resp = await quizApi.getById(quizId)
-      if (resp.data) {
-        setQuiz(resp.data as unknown as Quiz)
+      if (!resp.data) {
+        setError(resp.error || "Failed to load quiz")
+        return
+      }
+      setQuiz(resp.data as unknown as Quiz)
 
-        // Start (or resume) an attempt - the server enforces time limits
-        const startResp = await quizApi.startAttempt(quizId)
-        if (startResp.data) {
-          setAttemptId(startResp.data.attempt_id)
-          if (startResp.data.remaining_seconds !== null && startResp.data.remaining_seconds !== undefined) {
-            setTimeLeft(startResp.data.remaining_seconds)
-          } else if (resp.data.time_limit_seconds && resp.data.time_limit_seconds > 0) {
-            setTimeLeft(resp.data.time_limit_seconds)
-          }
-        } else if (startResp.error) {
-          setError(startResp.error)
-        }
-      } else if (resp.error) {
-        setError(resp.error)
+      // Start (or resume) the attempt so the server can enforce the time limit
+      const startResp = await quizApi.startAttempt(quizId)
+      if (!startResp.data) {
+        setError(startResp.error || "Unable to start this exam")
+        return
+      }
+      setAttemptId(startResp.data.attempt_id)
+
+      const limit = resp.data.time_limit_seconds
+      if (limit && limit > 0) {
+        const remaining = startResp.data.remaining_seconds
+        setTimeLeft(remaining !== null && remaining !== undefined ? remaining : limit)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load quiz")
     } finally {
       setLoading(false)
     }
+  }, [quizId])
+
+  useEffect(() => {
+    if (!token) {
+      router.push("/login")
+      return
+    }
+    loadQuiz()
+  }, [token, loadQuiz, router])
+
+  const handleSubmit = useCallback(async () => {
+    if (!quiz || !quizId || submittingRef.current || result) return
+    submittingRef.current = true
+    setSubmitting(true)
+
+    try {
+      const answerList = displayQuestions.map((q) => {
+        const type = normalizeQuestionType(q.type)
+        const value = answers[q.id]
+        const isAnswered = value !== undefined && value !== ""
+        return {
+          question_id: q.id,
+          answer: isAnswered ? value : null,
+          answer_index:
+            type === "multiple_choice" && isAnswered ? parseInt(value, 10) : undefined,
+        }
+      })
+
+      const resp = await quizApi.submitAttempt(quizId, answerList, attemptId)
+      if (resp.data) {
+        setResult(resp.data as unknown as QuizResult)
+        setTimeLeft(null)
+      } else {
+        setError(resp.error || "Failed to submit quiz")
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit quiz")
+    } finally {
+      submittingRef.current = false
+      setSubmitting(false)
+    }
+  }, [quiz, quizId, answers, attemptId, displayQuestions, result])
+
+  submitRef.current = () => {
+    void handleSubmit()
   }
 
+  // Countdown - independent of the answers so typing never delays the tick
   useEffect(() => {
-    if (quiz?.time_limit_seconds && timeLeft === null && quiz.time_limit_seconds > 0) {
-      setTimeLeft(quiz.time_limit_seconds)
-    }
-  }, [quiz, timeLeft])
-
-  useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) return
+    if (timeLeft === null || timeLeft <= 0 || result) return
     const timer = setTimeout(() => {
       setTimeLeft(timeLeft - 1)
       if (timeLeft === 1) {
-        handleSubmit()
+        submitRef.current()
       }
     }, 1000)
     return () => clearTimeout(timer)
-  }, [timeLeft])
+  }, [timeLeft, result])
 
   function handleAnswer(questionId: string, value: string) {
-    setAnswers({ ...answers, [questionId]: value })
-  }
-
-  async function handleSubmit() {
-    if (!quiz || !quizId) return
-    setSubmitting(true)
-
-    const answerList = displayQuestions.map((q) => {
-      const type = normalizeQuestionType(q.type)
-      const value = answers[q.id]
-      const isAnswered = value !== undefined && value !== ""
-      return {
-        question_id: q.id,
-        answer: isAnswered ? value : null,
-        answer_index:
-          type === "multiple_choice" && isAnswered ? parseInt(value, 10) : undefined,
-      }
-    })
-
-    const resp = await quizApi.submitAttempt(quizId, answerList, attemptId)
-    if (resp.data) {
-      setResult(resp.data as unknown as QuizResult)
-    } else {
-      setError(resp.error || "Failed to submit quiz")
-    }
-    setSubmitting(false)
+    setAnswers((prev) => ({ ...prev, [questionId]: value }))
   }
 
   if (loading) {
@@ -276,7 +299,7 @@ export default function TakeQuizPage() {
           <p className="text-muted-foreground mb-6">{quiz.description}</p>
         )}
 
-        <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }} className="space-y-6">
+        <form onSubmit={(e) => { e.preventDefault(); void handleSubmit() }} className="space-y-6">
           {displayQuestions.map((q, qIdx) => {
             const qType = normalizeQuestionType(q.type)
             return (

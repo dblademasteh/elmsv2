@@ -58,6 +58,24 @@ def _is_staff(user) -> bool:
     return user.role in ("admin", "instructor")
 
 
+def _quiz_settings(quiz) -> Dict[str, Any]:
+    """Quiz settings with safe fallbacks.
+
+    Legacy rows may hold NULL in the settings columns, so every value used for
+    logic or validation is normalised here.
+    """
+    return {
+        "title": quiz.title or "Untitled quiz",
+        "quiz_type": quiz.quiz_type or "multiple_choice",
+        "time_limit_seconds": quiz.time_limit_seconds,
+        "max_attempts": quiz.max_attempts if quiz.max_attempts is not None else 3,
+        "passing_grade": quiz.passing_grade if quiz.passing_grade is not None else 70.0,
+        "randomize_questions": bool(quiz.randomize_questions),
+        "show_results": True if quiz.show_results is None else bool(quiz.show_results),
+        "allow_retry": True if quiz.allow_retry is None else bool(quiz.allow_retry),
+    }
+
+
 def _sanitize_questions(questions: Any) -> List[Dict[str, Any]]:
     """Strip answer keys so a quiz can be delivered to a student."""
     sanitized = []
@@ -70,19 +88,20 @@ def _sanitize_questions(questions: Any) -> List[Dict[str, Any]]:
 
 def _quiz_response(quiz, questions: Optional[List[Dict[str, Any]]] = None) -> QuizResponse:
     """Build a quiz response, defaulting to the stored questions."""
+    settings = _quiz_settings(quiz)
     return QuizResponse(
         id=quiz.id,
         lesson_id=quiz.lesson_id,
-        title=quiz.title,
+        title=settings["title"],
         description=quiz.description,
         questions=questions if questions is not None else (quiz.questions or []),
-        time_limit_seconds=quiz.time_limit_seconds,
-        max_attempts=quiz.max_attempts,
-        passing_grade=quiz.passing_grade,
-        randomize_questions=quiz.randomize_questions,
-        show_results=quiz.show_results,
-        allow_retry=quiz.allow_retry,
-        quiz_type=quiz.quiz_type,
+        time_limit_seconds=settings["time_limit_seconds"],
+        max_attempts=settings["max_attempts"],
+        passing_grade=settings["passing_grade"],
+        randomize_questions=settings["randomize_questions"],
+        show_results=settings["show_results"],
+        allow_retry=settings["allow_retry"],
+        quiz_type=settings["quiz_type"],
         created_at=quiz.created_at,
     )
 
@@ -94,7 +113,7 @@ async def _ensure_quiz_owner(user, quiz, db) -> None:
 
     lesson = await db.get(Lesson, quiz.lesson_id)
     if not lesson:
-        return
+        raise HTTPException(status_code=404, detail="Quiz's lesson not found")
     course = await db.get(Course, lesson.course_id)
     if course and course.instructor_id != user.id and user.role != "admin":
         raise HTTPException(status_code=403, detail="You don't own this quiz")
@@ -110,7 +129,7 @@ async def _attempt_response(attempt, quiz, db, reveal: bool) -> QuizAttemptRespo
     grade = attempt.grade
     passed = attempt.passed
 
-    if not reveal and quiz is not None and not quiz.show_results:
+    if not reveal and quiz is not None and not _quiz_settings(quiz)["show_results"]:
         score = None
         grade = None
         passed = False
@@ -132,10 +151,10 @@ async def _attempt_response(attempt, quiz, db, reveal: bool) -> QuizAttemptRespo
         completed_at=attempt.completed_at,
         score=score,
         grade=grade,
-        passed=passed,
-        answers=attempt.answers,
-        attempt_number=attempt.attempt_number,
-        needs_review=attempt.needs_review,
+        passed=bool(passed),
+        answers=attempt.answers or [],
+        attempt_number=attempt.attempt_number or 1,
+        needs_review=bool(attempt.needs_review),
         graded_by=attempt.graded_by,
         graded_at=attempt.graded_at,
         feedback=attempt.feedback,
@@ -315,6 +334,9 @@ async def start_quiz_attempt(
 
     now = datetime.now(timezone.utc)
     attempts = await get_attempts_for_user(db, quiz_id, user.id)
+    settings = _quiz_settings(quiz)
+    time_limit = settings["time_limit_seconds"]
+    max_attempts = settings["max_attempts"]
 
     def _aware(dt):
         if dt is None:
@@ -323,10 +345,10 @@ async def start_quiz_attempt(
 
     # Resume an in-progress attempt, closing it first if its time limit has passed
     open_attempt = next((a for a in attempts if a.completed_at is None), None)
-    if open_attempt and quiz.time_limit_seconds:
+    if open_attempt and time_limit:
         started = _aware(open_attempt.started_at)
         elapsed = (now - started).total_seconds() if started else 0
-        if elapsed > quiz.time_limit_seconds + TIME_LIMIT_GRACE_SECONDS:
+        if elapsed > time_limit + TIME_LIMIT_GRACE_SECONDS:
             open_attempt.completed_at = now
             open_attempt.score = 0.0
             open_attempt.grade = 0.0
@@ -337,12 +359,12 @@ async def start_quiz_attempt(
 
     if open_attempt is None:
         # A fresh attempt is needed - enforce attempt limits
-        if not quiz.allow_retry and len(attempts) > 0:
+        if not settings["allow_retry"] and len(attempts) > 0:
             raise HTTPException(status_code=409, detail="Retry is not allowed for this quiz")
-        if len(attempts) >= quiz.max_attempts:
+        if len(attempts) >= max_attempts:
             raise HTTPException(
                 status_code=409,
-                detail=f"You have reached the maximum of {quiz.max_attempts} attempts",
+                detail=f"You have reached the maximum of {max_attempts} attempts",
             )
         open_attempt = await create_quiz_attempt(
             db=db,
@@ -352,20 +374,23 @@ async def start_quiz_attempt(
             answers=[],
             attempt_number=len(attempts) + 1,
         )
+        attempts_used = len(attempts) + 1
+    else:
+        attempts_used = len(attempts)
 
     remaining_seconds = None
-    if quiz.time_limit_seconds:
+    if time_limit:
         started = _aware(open_attempt.started_at) or now
-        remaining_seconds = max(0, int(quiz.time_limit_seconds - (now - started).total_seconds()))
+        remaining_seconds = max(0, int(time_limit - (now - started).total_seconds()))
 
     return {
         "attempt_id": str(open_attempt.id),
         "attempt_number": open_attempt.attempt_number,
         "started_at": (_aware(open_attempt.started_at) or now).isoformat(),
-        "time_limit_seconds": quiz.time_limit_seconds,
+        "time_limit_seconds": time_limit,
         "remaining_seconds": remaining_seconds,
-        "max_attempts": quiz.max_attempts,
-        "attempts_used": len(attempts),
+        "max_attempts": max_attempts,
+        "attempts_used": attempts_used,
     }
 
 
@@ -406,6 +431,9 @@ async def submit_quiz_attempt(
         }
         for a in attempt_data.answers
     ]
+    settings = _quiz_settings(quiz)
+    time_limit = settings["time_limit_seconds"]
+    max_attempts = settings["max_attempts"]
 
     if attempt_data.attempt_id:
         # Submit an attempt started earlier (time limits apply)
@@ -415,14 +443,14 @@ async def submit_quiz_attempt(
         if attempt.completed_at is not None:
             raise HTTPException(status_code=409, detail="This attempt has already been submitted")
 
-        if quiz.time_limit_seconds and attempt.started_at:
+        if time_limit and attempt.started_at:
             started = (
                 attempt.started_at
                 if attempt.started_at.tzinfo is not None
                 else attempt.started_at.replace(tzinfo=timezone.utc)
             )
             elapsed = (datetime.now(timezone.utc) - started).total_seconds()
-            if elapsed > quiz.time_limit_seconds + TIME_LIMIT_GRACE_SECONDS:
+            if elapsed > time_limit + TIME_LIMIT_GRACE_SECONDS:
                 attempt.completed_at = datetime.now(timezone.utc)
                 attempt.score = 0.0
                 attempt.grade = 0.0
@@ -436,7 +464,7 @@ async def submit_quiz_attempt(
     else:
         # Legacy path: no attempt started - create and grade immediately.
         # A time limit cannot be enforced without a start time, so reject it.
-        if quiz.time_limit_seconds:
+        if time_limit:
             raise HTTPException(
                 status_code=400,
                 detail="This quiz has a time limit; start the attempt first",
@@ -444,15 +472,15 @@ async def submit_quiz_attempt(
         attempts = await get_attempts_for_user(db, quiz_id, user.id)
         attempt_number = len(attempts) + 1
 
-        if not quiz.allow_retry and len(attempts) > 0:
+        if not settings["allow_retry"] and len(attempts) > 0:
             raise HTTPException(
                 status_code=409,
                 detail="Retry is not allowed for this quiz",
             )
-        if len(attempts) >= quiz.max_attempts:
+        if len(attempts) >= max_attempts:
             raise HTTPException(
                 status_code=409,
-                detail=f"You have reached the maximum of {quiz.max_attempts} attempts",
+                detail=f"You have reached the maximum of {max_attempts} attempts",
             )
 
         attempt = await create_quiz_attempt(
@@ -476,10 +504,10 @@ async def submit_quiz_attempt(
     await db.commit()
     await db.refresh(attempt)
 
-    passing_grade = quiz.passing_grade if quiz.passing_grade is not None else 0.0
+    passing_grade = settings["passing_grade"]
 
     # The quiz may hide results from students
-    if not quiz.show_results:
+    if not settings["show_results"]:
         return QuizResult(
             attempt_id=attempt.id,
             score=None,

@@ -175,6 +175,13 @@ export default function QuizManagementPage() {
         }
       }
       if (
+        q.type === "true_false" &&
+        q.correct_answer !== "true" &&
+        q.correct_answer !== "false"
+      ) {
+        return `Question ${i + 1} needs the correct answer set to True or False`
+      }
+      if (
         (q.type === "enumeration" || q.type === "identification") &&
         !String(q.correct_answer || "").trim()
       ) {

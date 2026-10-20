@@ -36,6 +36,16 @@ async def init_db():
         "ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS graded_by UUID",
         "ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS graded_at TIMESTAMPTZ",
         "ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS feedback TEXT",
+        # Backfill settings so a legacy row can never break a response
+        "UPDATE quizzes SET max_attempts = 3 WHERE max_attempts IS NULL",
+        "UPDATE quizzes SET passing_grade = 70 WHERE passing_grade IS NULL",
+        "UPDATE quizzes SET randomize_questions = FALSE WHERE randomize_questions IS NULL",
+        "UPDATE quizzes SET show_results = TRUE WHERE show_results IS NULL",
+        "UPDATE quizzes SET allow_retry = TRUE WHERE allow_retry IS NULL",
+        "UPDATE quizzes SET quiz_type = 'multiple_choice' WHERE quiz_type IS NULL",
+        "UPDATE quiz_attempts SET started_at = NOW() WHERE started_at IS NULL",
+        "UPDATE quiz_attempts SET passed = FALSE WHERE passed IS NULL",
+        "UPDATE quiz_attempts SET attempt_number = 1 WHERE attempt_number IS NULL",
     ]
     async with engine.begin() as conn:
         for statement in alter_statements:

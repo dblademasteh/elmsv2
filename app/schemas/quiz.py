@@ -93,7 +93,7 @@ class QuizUpdate(BaseModel):
 class QuizResponse(QuizBase):
     id: uuid.UUID
     lesson_id: uuid.UUID
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -110,7 +110,7 @@ class QuizAttemptResponse(BaseModel):
     user_id: uuid.UUID
     user_full_name: Optional[str] = None
     enrollment_id: Optional[uuid.UUID] = None
-    started_at: datetime
+    started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     score: Optional[float] = None
     grade: Optional[float] = None

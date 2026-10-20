@@ -1,5 +1,8 @@
 """Quiz workflow tests: type taxonomy, grading, answer keys, manual review."""
+import os
 import uuid
+
+import sqlalchemy as sa
 
 QUIZES = "/api/v1/courses/quizzes"
 
@@ -111,6 +114,37 @@ def _submit(client, headers, quiz_id, answers):
         json={"attempt_id": attempt_id, "answers": answers},
     )
     return response
+
+
+def _clear_quiz_settings(quiz_id):
+    """Simulate a legacy row that predates the quiz settings columns.
+
+    The constraints are dropped for the test database so the row can hold the
+    NULLs an un-migrated database would still contain.
+    """
+    columns = (
+        "max_attempts",
+        "passing_grade",
+        "randomize_questions",
+        "show_results",
+        "allow_retry",
+        "quiz_type",
+    )
+    engine = sa.create_engine(os.environ["ALEMBIC_DATABASE_URL"])
+    with engine.begin() as conn:
+        for column in columns:
+            conn.execute(
+                sa.text(f"ALTER TABLE quizzes ALTER COLUMN {column} DROP NOT NULL")
+            )
+        conn.execute(
+            sa.text(
+                "UPDATE quizzes SET max_attempts = NULL, passing_grade = NULL, "
+                "randomize_questions = NULL, show_results = NULL, allow_retry = NULL, "
+                "quiz_type = NULL WHERE id = :id"
+            ),
+            {"id": quiz_id},
+        )
+    engine.dispose()
 
 
 def test_quiz_type_is_persisted_and_updatable(client, auth_headers):
@@ -345,3 +379,49 @@ def test_student_cannot_take_quiz_without_enrollment(client, auth_headers):
 
     response = client.post(f"{QUIZES}/{quiz['id']}/start", headers=auth_headers["student"], json={})
     assert response.status_code == 403, response.text
+
+
+def test_start_reports_the_attempt_in_use(client, auth_headers):
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+    quiz = _create_quiz(client, auth_headers["instructor"], lesson["id"], AUTO_QUESTIONS)
+    _enroll(client, auth_headers["student"], course["id"])
+
+    response = client.post(
+        f"{QUIZES}/{quiz['id']}/start", headers=auth_headers["student"], json={}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["attempts_used"] == 1
+    assert body["attempt_number"] == 1
+
+    # Resuming the same attempt must not consume another one
+    again = client.post(
+        f"{QUIZES}/{quiz['id']}/start", headers=auth_headers["student"], json={}
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["attempts_used"] == 1
+    assert again.json()["attempt_id"] == body["attempt_id"]
+
+
+def test_legacy_quiz_rows_without_settings_still_work(client, auth_headers):
+    course = _create_course(client, auth_headers["instructor"])
+    lesson = _create_lesson(client, auth_headers["instructor"], course["id"])
+    quiz = _create_quiz(client, auth_headers["instructor"], lesson["id"], AUTO_QUESTIONS)
+    _enroll(client, auth_headers["student"], course["id"])
+
+    _clear_quiz_settings(quiz["id"])
+
+    detail = client.get(f"{QUIZES}/{quiz['id']}", headers=auth_headers["instructor"])
+    assert detail.status_code == 200, detail.text
+    body = detail.json()
+    assert body["max_attempts"] == 3
+    assert body["passing_grade"] == 70.0
+    assert body["show_results"] is True
+    assert body["allow_retry"] is True
+    assert body["quiz_type"] == "multiple_choice"
+
+    # Starting and submitting must not blow up on the missing settings
+    result = _submit(client, auth_headers["student"], quiz["id"], CORRECT_ANSWERS)
+    assert result.status_code == 200, result.text
+    assert result.json()["score"] == 100.0

@@ -439,7 +439,8 @@ export const quizApi = {
       results_hidden: boolean;
     }>(`/courses/quizzes/${quizId}/attempt`, attemptId ? { answers, attempt_id: attemptId } : { answers }),
 
-  getMyAttempts: (quizId: string) =>
+  /** Attempts for a quiz: the student's own, or every attempt for staff. */
+  getAttempts: (quizId: string) =>
     api.get<Array<QuizAttempt>>(`/courses/quizzes/${quizId}/attempts`),
 
   /** Instructors: grade the manually graded part of an attempt. */

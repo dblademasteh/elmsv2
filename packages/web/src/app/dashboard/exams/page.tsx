@@ -20,6 +20,7 @@ import { formatDateTime, formatDuration } from "@/lib/format"
 import { useToast } from "@/components/ui/use-toast"
 
 const createExamSchema = z.object({
+  course_id: z.string().min(1, "Select a course"),
   lesson_id: z.string().min(1, "Select a lesson"),
   title: z.string().min(3, "Exam title must be at least 3 characters"),
   description: z.string().optional(),
@@ -68,6 +69,7 @@ export default function ExamsPage() {
   const form = useForm<CreateExamData>({
     resolver: zodResolver(createExamSchema),
     defaultValues: {
+      course_id: "",
       lesson_id: "",
       title: "",
       description: "",
@@ -81,6 +83,7 @@ export default function ExamsPage() {
   const load = useCallback(async () => {
     if (!user) return
     setLoading(true)
+    const failedCourses: string[] = []
     try {
       if (isManager) {
         const coursesResp = await courseApi.list({ mine: true, limit: 50 })
@@ -97,6 +100,9 @@ export default function ExamsPage() {
               quizApi.getByCourse(course.id),
               lessonApi.listByCourse(course.id),
             ])
+            if (quizzesResp.error) {
+              failedCourses.push(course.title)
+            }
             const lessonTitles = new Map<string, string>(
               (lessonsResp.data || []).map((l) => [l.id, l.title]),
             )
@@ -142,6 +148,9 @@ export default function ExamsPage() {
               quizApi.getByCourse(course.course_id),
               lessonApi.listByCourse(course.course_id),
             ])
+            if (quizzesResp.error) {
+              failedCourses.push(course.course_title)
+            }
             const lessonTitles = new Map<string, string>(
               (lessonsResp.data || []).map((l) => [l.id, l.title]),
             )
@@ -169,6 +178,12 @@ export default function ExamsPage() {
     } catch {
       toast({ title: "Failed to load exams", })
     } finally {
+      if (failedCourses.length > 0) {
+        toast({
+          title: "Some exams could not be loaded",
+          description: failedCourses.join(", "),
+        })
+      }
       setLoading(false)
     }
   }, [user, isManager, toast])
@@ -178,13 +193,12 @@ export default function ExamsPage() {
   }, [load])
 
   const handleCourseChange = (value: string) => {
+    // The lesson belongs to the selected course, so the old lesson is invalid
     form.setValue("lesson_id", "")
     setLessons([])
     if (!value) return
-    const course = courses.find((c) => c.id === value)
-    if (!course) return
     setLoadingLessons(true)
-    lessonApi.listByCourse(course.id).then((resp) => {
+    lessonApi.listByCourse(value).then((resp) => {
       setLessons(resp.data || [])
       setLoadingLessons(false)
     })
@@ -219,7 +233,7 @@ export default function ExamsPage() {
         return
       }
       setDialogOpen(false)
-      form.reset({ lesson_id: "", title: "", description: "", exam_type: "multiple_choice", time_limit_minutes: 60, max_attempts: 3, passing_grade: 70 })
+      form.reset({ course_id: "", lesson_id: "", title: "", description: "", exam_type: "multiple_choice", time_limit_minutes: 60, max_attempts: 3, passing_grade: 70 })
       setLessons([])
       load()
       toast({ title: "Exam created" })
@@ -380,7 +394,7 @@ export default function ExamsPage() {
             <div className="space-y-1.5">
               <Label htmlFor="exam-course">Course</Label>
               <Controller
-                name="lesson_id"
+                name="course_id"
                 control={form.control}
                 render={({ field }) => (
                   <Select
@@ -405,8 +419,8 @@ export default function ExamsPage() {
                   </Select>
                 )}
               />
-              {form.formState.errors.lesson_id && (
-                <p className="text-xs text-destructive">{form.formState.errors.lesson_id.message}</p>
+              {form.formState.errors.course_id && (
+                <p className="text-xs text-destructive">{form.formState.errors.course_id.message}</p>
               )}
             </div>
 
@@ -419,7 +433,7 @@ export default function ExamsPage() {
                   <Select
                     value={field.value}
                     onValueChange={field.onChange}
-                    disabled={loadingLessons || !form.getValues("lesson_id")}
+                    disabled={loadingLessons || !form.getValues("course_id")}
                   >
                     <SelectTrigger className="w-full" id="exam-lesson">
                       <SelectValue placeholder={loadingLessons ? "Loading lessons…" : lessons.length === 0 ? "No lessons in this course" : "Select a lesson…"} />
@@ -435,6 +449,9 @@ export default function ExamsPage() {
                   </Select>
                 )}
               />
+              {form.formState.errors.lesson_id && (
+                <p className="text-xs text-destructive">{form.formState.errors.lesson_id.message}</p>
+              )}
             </div>
 
             <div className="space-y-1.5">
