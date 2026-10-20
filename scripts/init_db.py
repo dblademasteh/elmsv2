@@ -51,6 +51,35 @@ async def init_db():
         for statement in alter_statements:
             await conn.execute(text(statement))
 
+    # Column constraints, mirroring the Alembic migration. Each statement runs on
+    # its own so a failure can never block the application from starting.
+    constraint_statements = [
+        "ALTER TABLE quizzes ALTER COLUMN max_attempts SET DEFAULT 3, "
+        "ALTER COLUMN max_attempts SET NOT NULL",
+        "ALTER TABLE quizzes ALTER COLUMN passing_grade SET DEFAULT 70, "
+        "ALTER COLUMN passing_grade SET NOT NULL",
+        "ALTER TABLE quizzes ALTER COLUMN randomize_questions SET DEFAULT FALSE, "
+        "ALTER COLUMN randomize_questions SET NOT NULL",
+        "ALTER TABLE quizzes ALTER COLUMN show_results SET DEFAULT TRUE, "
+        "ALTER COLUMN show_results SET NOT NULL",
+        "ALTER TABLE quizzes ALTER COLUMN allow_retry SET DEFAULT TRUE, "
+        "ALTER COLUMN allow_retry SET NOT NULL",
+        "ALTER TABLE quizzes ALTER COLUMN quiz_type SET DEFAULT 'multiple_choice', "
+        "ALTER COLUMN quiz_type SET NOT NULL",
+        "ALTER TABLE quiz_attempts ALTER COLUMN started_at SET DEFAULT NOW(), "
+        "ALTER COLUMN started_at SET NOT NULL",
+        "ALTER TABLE quiz_attempts ALTER COLUMN passed SET DEFAULT FALSE, "
+        "ALTER COLUMN passed SET NOT NULL",
+        "ALTER TABLE quiz_attempts ALTER COLUMN attempt_number SET DEFAULT 1, "
+        "ALTER COLUMN attempt_number SET NOT NULL",
+    ]
+    for statement in constraint_statements:
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text(statement))
+        except Exception as exc:  # a constraint must never block startup
+            logger.warning(f"Skipped constraint statement ({exc})")
+
     logger.info("✅ Tables created successfully!")
     
     # Connect to database
