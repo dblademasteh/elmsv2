@@ -33,6 +33,9 @@ ADMIN_URL = (
 # Point the application at the test database before any app import.
 os.environ["DATABASE_URL"] = ASYNC_URL
 os.environ["ALEMBIC_DATABASE_URL"] = SYNC_URL
+# The suite exercises the dev-only password-reset helper, which is opt-in.
+os.environ["ENVIRONMENT"] = "development"
+os.environ["DEBUG_RESET_TOKEN"] = "true"
 
 USERS = {
     "admin": {"email": "admin@test.com", "password": "AdminPass123!", "role": "admin", "full_name": "Test Admin"},

@@ -29,8 +29,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set in .env}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in .env}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - FRONTEND_URL=${FRONTEND_URL:-https://${WEB_DOMAIN:-localhost:3000}}
       - PORT=8080
     depends_on:
       postgres:

@@ -109,3 +109,19 @@ def test_unknown_email_reset_does_not_leak(client):
     assert known.status_code == unknown.status_code == 200
     assert known.json()["message"] == unknown.json()["message"]
     assert "reset_token" not in unknown.json()
+
+
+def test_reset_token_is_not_disclosed_unless_opted_in(client, monkeypatch):
+    """Without DEBUG_RESET_TOKEN the response must never carry a usable token."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "DEBUG_RESET_TOKEN", False)
+    email = f"noinline-{uuid.uuid4().hex[:8]}@test.com"
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "full_name": "No Inline", "password": "OldPass123!"},
+    )
+
+    request = client.post("/api/v1/auth/reset-password", json={"email": email})
+    assert request.status_code == 200
+    assert "reset_token" not in request.json()
