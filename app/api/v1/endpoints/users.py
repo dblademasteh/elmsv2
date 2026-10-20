@@ -4,7 +4,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.schemas.user import UserResponse, UserUpdate
 from app.crud.user import get_user_by_id, get_users, get_user_count, update_user
 from app.db.database import get_db
-from app.core.security import decode_token, get_password_hash
+from app.core.security import decode_token, get_password_hash, verify_password
 from typing import List, Optional
 import uuid
 
@@ -70,6 +70,16 @@ async def update_current_user(
 
     # Handle password change separately
     if user_in.password:
+        if not user_in.current_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is required to set a new password",
+            )
+        if not verify_password(user_in.current_password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is incorrect",
+            )
         update_data["hashed_password"] = get_password_hash(user_in.password)
 
     if not update_data:

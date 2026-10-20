@@ -21,6 +21,56 @@ def test_register_and_login_me(client):
     assert me.json()["email"] == email
 
 
+def test_password_change_requires_the_current_password(client):
+    """Changing a password has to prove ownership of the current one."""
+    email = f"pw-{uuid.uuid4().hex[:8]}@test.com"
+    register = client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "full_name": "Pw User", "password": "Password123!"},
+    )
+    assert register.status_code in (200, 201), register.text
+    login = client.post(
+        "/api/v1/auth/login", json={"email": email, "password": "Password123!"}
+    )
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # No current password at all
+    response = client.put(
+        "/api/v1/users/me", headers=headers, json={"password": "NewPassword123!"}
+    )
+    assert response.status_code == 400
+    assert "current password" in response.json()["detail"].lower()
+
+    # Wrong current password
+    response = client.put(
+        "/api/v1/users/me",
+        headers=headers,
+        json={"password": "NewPassword123!", "current_password": "NotThePassword1!"},
+    )
+    assert response.status_code == 400
+    assert "current password" in response.json()["detail"].lower()
+
+    # The old password still works, so the rejected attempts changed nothing
+    assert client.post(
+        "/api/v1/auth/login", json={"email": email, "password": "Password123!"}
+    ).status_code == 200
+
+    # Correct current password
+    response = client.put(
+        "/api/v1/users/me",
+        headers=headers,
+        json={"password": "NewPassword123!", "current_password": "Password123!"},
+    )
+    assert response.status_code == 200, response.text
+    assert client.post(
+        "/api/v1/auth/login", json={"email": email, "password": "NewPassword123!"}
+    ).status_code == 200
+    assert client.post(
+        "/api/v1/auth/login", json={"email": email, "password": "Password123!"}
+    ).status_code == 401
+
+
 def test_login_wrong_password(client):
     response = client.post(
         "/api/v1/auth/login",

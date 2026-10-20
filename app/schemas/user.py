@@ -15,6 +15,7 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=2, max_length=255)
     avatar_url: Optional[str] = None
     password: Optional[str] = None
+    current_password: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
     is_verified: Optional[bool] = None
